@@ -1,0 +1,468 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AlkExpress24 – Drinks zum Event in Graz</title>
+<meta name="description" content="AlkExpress24: Getränke online bestellen und in wenigen Minuten zu deinem Event in Graz geliefert bekommen. Ausweiskontrolle bei jeder Übergabe.">
+<meta name="theme-color" content="#1E1B4B">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#1E1B4B;        /* Nachthimmel-Indigo */
+  --ink-2:#2A2665;
+  --paper:#F6F4FF;
+  --muted:#B9B5E6;
+  --band16:#FFC83D;     /* Bändchen 16+ */
+  --band18:#FF5B4F;     /* Bändchen 18+ */
+  --go:#4FD6A8;         /* unterwegs / bestätigt */
+  --line:rgba(246,244,255,.14);
+  --r-sm:8px; --r-lg:22px;
+  --display:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"DM Sans", system-ui, sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:17px;line-height:1.5}
+a{color:inherit}
+button,input,select,textarea{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--band16);outline-offset:3px}
+.wrap{max-width:1040px;margin:0 auto;padding:0 20px}
+
+/* Header */
+header{position:sticky;top:0;z-index:20;background:rgba(30,27,75,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.bar{display:flex;align-items:center;justify-content:space-between;height:64px}
+.logo{font-family:var(--display);font-weight:800;font-size:22px;font-stretch:80%;letter-spacing:-.01em;text-decoration:none}
+.logo b{color:var(--band18)}
+.cart-btn{display:flex;align-items:center;gap:10px;background:var(--paper);color:var(--ink);border:0;border-radius:999px;padding:9px 16px;font-weight:700;cursor:pointer}
+.cart-btn .n{background:var(--band18);color:#fff;border-radius:999px;min-width:24px;height:24px;display:grid;place-items:center;font-size:13px;padding:0 6px}
+
+/* Hero */
+.hero{position:relative;overflow:hidden;padding:56px 0 120px}
+.hero h1{font-family:var(--display);font-weight:800;font-stretch:75%;font-size:clamp(52px,13vw,128px);line-height:.88;letter-spacing:-.02em;margin:0 0 22px;max-width:9ch}
+.hero p{max-width:34ch;color:var(--muted);font-size:19px;margin:0 0 28px}
+.cta{display:inline-flex;align-items:center;gap:10px;background:var(--band16);color:var(--ink);font-weight:700;text-decoration:none;border-radius:999px;padding:15px 26px;border:0;cursor:pointer;font-size:17px}
+.cta:hover{filter:brightness(1.05)}
+/* Das Bändchen: das eine auffällige Element */
+.bands{position:absolute;left:-10%;right:-10%;bottom:28px;transform:rotate(-4deg);display:grid;gap:10px;pointer-events:none}
+.band{height:34px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;font-family:var(--display);font-weight:700;font-stretch:80%;font-size:15px;color:var(--ink);
+  box-shadow:inset 0 3px 0 -1px rgba(30,27,75,.18),inset 0 -3px 0 -1px rgba(30,27,75,.18)}
+.band span{display:inline-block;padding-left:20px;animation:slide 40s linear infinite}
+.band.b18{background:var(--band18);color:#fff}
+.band.b16{background:var(--band16)}
+.band.b16 span{animation-direction:reverse}
+@keyframes slide{to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.band span{animation:none}}
+
+/* Ablauf */
+.steps{display:grid;gap:0;margin:0;padding:0;list-style:none;border-top:1px solid var(--line)}
+.steps li{display:grid;grid-template-columns:56px 1fr;gap:4px 16px;padding:22px 0;border-bottom:1px solid var(--line)}
+.steps .k{font-family:var(--display);font-weight:800;font-size:36px;line-height:1;color:var(--band16);grid-row:span 2}
+.steps h3{margin:0;font-family:var(--display);font-size:22px;font-stretch:85%}
+.steps p{margin:0;color:var(--muted)}
+@media(min-width:820px){.steps{grid-template-columns:repeat(3,1fr);gap:28px;border:0}.steps li{border:0;border-top:3px solid var(--paper);grid-template-columns:1fr}.steps .k{grid-row:auto}}
+
+section{padding:56px 0;scroll-margin-top:64px}
+h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(34px,7vw,56px);line-height:.95;margin:0 0 10px;letter-spacing:-.01em}
+.lede{color:var(--muted);margin:0 0 28px;max-width:52ch}
+
+/* Sortiment */
+.cat{margin-top:36px}
+.cat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.cat-head h3{margin:0;font-family:var(--display);font-size:26px;font-stretch:85%}
+.tag{font-weight:700;font-size:13px;border-radius:999px;padding:4px 10px;color:var(--ink);white-space:nowrap}
+.tag.t16{background:var(--band16)}
+.tag.t18{background:var(--band18);color:#fff}
+.items{list-style:none;margin:0;padding:0}
+.item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
+.item .nm{font-weight:700}
+.item .sz{color:var(--muted);font-size:15px}
+.item .right{display:flex;align-items:center;gap:14px}
+.price{font-variant-numeric:tabular-nums;font-weight:700;min-width:64px;text-align:right}
+.step{display:flex;align-items:center;background:var(--ink-2);border-radius:999px;border:1px solid var(--line)}
+.step button{width:38px;height:38px;border:0;background:none;cursor:pointer;font-size:20px;border-radius:999px}
+.step button:hover{background:rgba(255,255,255,.08)}
+.step output{min-width:22px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
+.note{font-size:14px;color:var(--muted);margin-top:14px}
+
+/* Jugendschutz */
+.youth{background:var(--paper);color:var(--ink);border-radius:var(--r-lg);padding:32px 24px;display:grid;gap:18px}
+.youth h2{color:var(--ink)}
+.youth p{margin:0;max-width:60ch}
+.rules{display:grid;gap:10px}
+.rule{display:flex;gap:14px;align-items:center;font-weight:500}
+.rule .tag{min-width:52px;text-align:center}
+
+footer{border-top:1px solid var(--line);padding:32px 0 120px;color:var(--muted);font-size:15px}
+footer nav{display:flex;flex-wrap:wrap;gap:8px 20px;margin-bottom:12px}
+footer button{background:none;border:0;padding:0;text-decoration:underline;cursor:pointer;color:var(--paper)}
+
+/* Mobile Warenkorb-Leiste */
+.dock{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:15;display:none}
+.dock.show{display:block}
+.dock button{width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--band16);color:var(--ink);border:0;border-radius:999px;padding:16px 22px;font-weight:700;font-size:17px;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+
+/* Drawer & Dialoge */
+.scrim{position:fixed;inset:0;background:rgba(10,8,35,.6);z-index:30;opacity:0;pointer-events:none;transition:opacity .2s}
+.scrim.open{opacity:1;pointer-events:auto}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(460px,100%);background:var(--paper);color:var(--ink);z-index:31;transform:translateX(100%);transition:transform .25s ease;display:flex;flex-direction:column}
+.drawer.open{transform:none}
+@media (prefers-reduced-motion:reduce){.drawer,.scrim{transition:none}}
+.d-head{display:flex;justify-content:space-between;align-items:center;padding:18px 20px;border-bottom:1px solid #DDD9F5}
+.d-head h2{font-size:30px;margin:0}
+.x{width:40px;height:40px;border-radius:999px;border:0;background:#ECE9FF;cursor:pointer;font-size:20px}
+.d-body{overflow:auto;padding:8px 20px 20px;flex:1}
+.lines{list-style:none;margin:0;padding:0}
+.lines li{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #E6E3FA}
+.lines .q{color:#5A5690}
+.sum{display:grid;gap:4px;margin:14px 0 22px;font-variant-numeric:tabular-nums}
+.sum div{display:flex;justify-content:space-between}
+.sum .tot{font-weight:800;font-size:20px;border-top:2px solid var(--ink);padding-top:8px;margin-top:4px}
+.empty{padding:30px 0;color:#5A5690}
+form{display:grid;gap:14px}
+label{display:grid;gap:6px;font-weight:700;font-size:15px}
+label small{font-weight:400;color:#5A5690}
+input,select,textarea{border:1.5px solid #CFCBEF;border-radius:var(--r-sm);padding:12px;background:#fff;color:var(--ink);font-size:16px}
+textarea{min-height:76px;resize:vertical}
+.check{display:flex;gap:10px;align-items:flex-start;font-weight:500}
+.check input{width:20px;height:20px;margin-top:2px;flex:none}
+.err{background:#FFE4E1;color:#8E1D14;border-radius:var(--r-sm);padding:12px;font-weight:500;display:none}
+.err.show{display:block}
+.send{background:var(--ink);color:var(--paper);border:0;border-radius:999px;padding:16px;font-weight:700;font-size:17px;cursor:pointer}
+.send:disabled{opacity:.4;cursor:not-allowed}
+
+dialog{border:0;border-radius:var(--r-lg);padding:28px 24px;max-width:min(440px,calc(100% - 32px));background:var(--paper);color:var(--ink)}
+dialog::backdrop{background:rgba(10,8,35,.85)}
+dialog h2{font-size:36px}
+dialog p{margin:0 0 18px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.btn2{border:1.5px solid var(--ink);background:none;border-radius:999px;padding:13px 20px;font-weight:700;cursor:pointer;color:var(--ink)}
+.btn1{border:0;background:var(--ink);color:var(--paper);border-radius:999px;padding:13px 20px;font-weight:700;cursor:pointer}
+.legal{max-width:560px}
+.legal h3{margin:18px 0 4px;font-family:var(--display)}
+.legal p{margin:0 0 8px;font-size:15px}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <a href="#" class="logo">AlkExpress<b>24</b></a>
+    <button class="cart-btn" id="openCart" aria-label="Warenkorb öffnen">Warenkorb <span class="n" id="count">0</span></button>
+  </div>
+</header>
+
+<main>
+  <div class="hero">
+    <div class="wrap">
+      <h1>Drinks zum Event. In 15 Minuten.</h1>
+      <p>Bestell online, sag uns wo du bist, und wir bringen dir die Getränke zu Fuß ans Event in Graz. Ausweis bereithalten.</p>
+      <a class="cta" href="#sortiment">Getränke auswählen</a>
+    </div>
+    <div class="bands" aria-hidden="true">
+      <div class="band b18"><span id="t18"></span></div>
+      <div class="band b16"><span id="t16"></span></div>
+    </div>
+  </div>
+
+  <section>
+    <div class="wrap">
+      <h2>So läuft's</h2>
+      <p class="lede">Unser Lieferwagen steht schon in der Nähe der Events. Deshalb geht's so schnell.</p>
+      <ol class="steps">
+        <li><span class="k">1</span><h3>Bestellen</h3><p>Getränke auswählen, Treffpunkt beim Event angeben, absenden.</p></li>
+        <li><span class="k">2</span><h3>Bestätigung</h3><p>Wir melden uns per WhatsApp mit der Lieferzeit, meist 10–20 Minuten.</p></li>
+        <li><span class="k">3</span><h3>Übergabe mit Ausweis</h3><p>Wir prüfen deinen Ausweis und übergeben nur an die Person, die bestellt hat. Bezahlt wird bar oder mit Karte.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="sortiment">
+    <div class="wrap">
+      <h2>Sortiment</h2>
+      <p class="lede">Alles gekühlt. Preise inkl. USt., zzgl. Liefergebühr.</p>
+      <div id="catalog"></div>
+      <p class="note">Mindestbestellwert <span id="minVal"></span>. Liefergebühr <span id="feeVal"></span>.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="youth">
+        <h2>Jugendschutz ist bei uns Pflicht</h2>
+        <p>Wir halten uns an das Steiermärkische Jugendgesetz. Bei jeder Übergabe kontrollieren wir einen amtlichen Lichtbildausweis.</p>
+        <div class="rules">
+          <div class="rule"><span class="tag t16">16+</span>Bier, Wein, Sekt, Cider, Most</div>
+          <div class="rule"><span class="tag t18">18+</span>Spirituosen und alle Mischgetränke mit Spirituosen</div>
+        </div>
+        <p>Kein Ausweis oder zu jung: keine Übergabe. Wir liefern nicht an erkennbar Betrunkene und geben nichts zum Weiterreichen an Jüngere ab.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <nav>
+      <button data-legal="impressum">Impressum</button>
+      <button data-legal="agb">AGB</button>
+      <button data-legal="datenschutz">Datenschutz</button>
+    </nav>
+    <div>© <span id="yr"></span> AlkExpress24 · Graz</div>
+  </div>
+</footer>
+
+<div class="dock" id="dock"><button id="dockBtn"><span id="dockTxt">Warenkorb</span><span id="dockSum"></span></button></div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer" id="drawer" aria-label="Warenkorb" aria-hidden="true">
+  <div class="d-head"><h2>Deine Bestellung</h2><button class="x" id="closeCart" aria-label="Schließen">✕</button></div>
+  <div class="d-body">
+    <div id="cartView"></div>
+    <form id="orderForm" novalidate>
+      <label>Name <input name="name" autocomplete="name" required></label>
+      <label>Handynummer <small>für WhatsApp-Rückmeldung</small><input name="phone" type="tel" autocomplete="tel" required></label>
+      <label>Event / Ort <input name="event" placeholder="z. B. Orpheum, Uni-Fest Unicorn" required></label>
+      <label>Treffpunkt <small>So finden wir dich schnell</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke" required></textarea></label>
+      <label>Geburtsdatum <input name="dob" type="date" required></label>
+      <label>Zahlung
+        <select name="pay"><option>Bar bei Übergabe</option><option>Karte bei Übergabe</option></select>
+      </label>
+      <label class="check"><input type="checkbox" name="id" required><span>Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
+      <label class="check"><input type="checkbox" name="agb" required><span>Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
+      <div class="err" id="err" role="alert"></div>
+      <button class="send" id="send" type="submit">Bestellung per WhatsApp senden</button>
+    </form>
+  </div>
+</aside>
+
+<dialog id="gate">
+  <h2>Bist du mindestens 16?</h2>
+  <p>AlkExpress24 verkauft alkoholische Getränke. Bei der Lieferung prüfen wir deinen Ausweis.</p>
+  <div class="row">
+    <button class="btn1" id="gateYes">Ja, ich bin 16 oder älter</button>
+    <button class="btn2" id="gateNo">Nein</button>
+  </div>
+</dialog>
+
+<dialog id="legalDlg" class="legal">
+  <div id="legalBody"></div>
+  <div class="row" style="margin-top:16px"><button class="btn1" id="legalClose">Schließen</button></div>
+</dialog>
+
+<script>
+/* ============ EINSTELLUNGEN – hier anpassen ============ */
+const CONFIG = {
+  whatsapp: "",            // z. B. "43664xxxxxxx" (ohne + und Leerzeichen). Leer = Bestellung per E-Mail
+  email: "bestellung@alkexpress24.at",
+  minOrder: 15,            // Mindestbestellwert in €
+  fee: 3.9,                // Liefergebühr in €
+  impressum: {             // Pflicht laut ECG/UGB – vor Veröffentlichung ausfüllen!
+    name: "[Vor- und Nachname]",
+    address: "[Straße Nr., 8010 Graz]",
+    email: "[E-Mail]",
+    phone: "[Telefon]",
+    gewerbe: "Handelsgewerbe, Gewerbebehörde: Magistrat Graz",
+    uid: "[UID-Nummer, falls vorhanden]",
+    kammer: "Wirtschaftskammer Steiermark"
+  }
+};
+/* Sortiment: age 16 = Bier/Wein/Sekt, 18 = Spirituosen. Beispielpreise. */
+const CATALOG = [
+  { title:"Bier & Cider", age:16, items:[
+    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:2.4},
+    {id:"b2", name:"Gösser Märzen", size:"Dose 0,5 l", price:2.6},
+    {id:"b3", name:"Bier 6er-Pack", size:"6 × 0,5 l", price:12.9},
+    {id:"b4", name:"Cider Apfel", size:"Flasche 0,33 l", price:3.2},
+  ]},
+  { title:"Wein & Sekt", age:16, items:[
+    {id:"w1", name:"Prosecco", size:"Flasche 0,75 l", price:11.9},
+    {id:"w2", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.4},
+    {id:"w3", name:"Welschriesling Steiermark", size:"Flasche 0,75 l", price:12.9},
+  ]},
+  { title:"Spirituosen & Mischgetränke", age:18, items:[
+    {id:"s1", name:"Vodka", size:"Flasche 0,7 l", price:19.9},
+    {id:"s2", name:"Jägermeister", size:"Flasche 0,7 l", price:22.9},
+    {id:"s3", name:"Gin", size:"Flasche 0,7 l", price:27.9},
+    {id:"s4", name:"Vodka-Energy Fertigmix", size:"Dose 0,33 l", price:3.9},
+  ]},
+  { title:"Ohne Alkohol", age:0, items:[
+    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.2},
+    {id:"n2", name:"Cola", size:"Flasche 0,5 l", price:2.0},
+    {id:"n3", name:"Mineralwasser", size:"Flasche 0,5 l", price:1.5},
+    {id:"n4", name:"Becher 10 Stück", size:"Mehrweg", price:2.0},
+  ]},
+];
+/* ======================================================= */
+
+const eur = n => n.toLocaleString("de-AT",{style:"currency",currency:"EUR"});
+const store = {
+  get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+const ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:c.age}])));
+let cart = store.get("ae24_cart") || {};
+for (const id in cart) if (!ALL[id]) delete cart[id];
+
+/* Bändchen-Laufschrift */
+const t18 = "18+ SPIRITUOSEN ✦ AUSWEIS BEREITHALTEN ✦ ";
+const t16 = "16+ BIER · WEIN · SEKT ✦ LIEFERUNG ZUM EVENT ✦ ";
+document.getElementById("t18").textContent = t18.repeat(12);
+document.getElementById("t16").textContent = t16.repeat(12);
+document.getElementById("yr").textContent = new Date().getFullYear();
+document.getElementById("minVal").textContent = eur(CONFIG.minOrder);
+document.getElementById("feeVal").textContent = eur(CONFIG.fee);
+
+/* Katalog rendern */
+const cat = document.getElementById("catalog");
+cat.innerHTML = CATALOG.map(c => `
+  <div class="cat">
+    <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>
+    <ul class="items">${c.items.map(i => `
+      <li class="item">
+        <div><div class="nm">${i.name}</div><div class="sz">${i.size}</div></div>
+        <div class="right">
+          <span class="price">${eur(i.price)}</span>
+          <div class="step" role="group" aria-label="Menge ${i.name}">
+            <button type="button" data-dec="${i.id}" aria-label="${i.name} weniger">−</button>
+            <output id="q_${i.id}">0</output>
+            <button type="button" data-inc="${i.id}" aria-label="${i.name} mehr">+</button>
+          </div>
+        </div>
+      </li>`).join("")}</ul>
+  </div>`).join("");
+
+cat.addEventListener("click", e => {
+  const inc = e.target.dataset.inc, dec = e.target.dataset.dec;
+  if (inc) cart[inc] = (cart[inc]||0) + 1;
+  if (dec && cart[dec]) { cart[dec]--; if (!cart[dec]) delete cart[dec]; }
+  if (inc || dec) render();
+});
+
+function totals(){
+  const sub = Object.entries(cart).reduce((s,[id,q]) => s + ALL[id].price*q, 0);
+  const n = Object.values(cart).reduce((a,b)=>a+b,0);
+  const maxAge = Object.keys(cart).reduce((m,id)=>Math.max(m,ALL[id].age),0);
+  return {sub, n, maxAge, total: sub ? sub + CONFIG.fee : 0};
+}
+
+function render(){
+  store.set("ae24_cart", cart);
+  for (const id in ALL) document.getElementById("q_"+id).textContent = cart[id]||0;
+  const t = totals();
+  document.getElementById("count").textContent = t.n;
+  const dock = document.getElementById("dock");
+  dock.classList.toggle("show", t.n > 0 && !document.getElementById("drawer").classList.contains("open"));
+  document.getElementById("dockTxt").textContent = `Warenkorb ansehen (${t.n})`;
+  document.getElementById("dockSum").textContent = eur(t.total);
+
+  const v = document.getElementById("cartView");
+  if (!t.n){
+    v.innerHTML = `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
+  } else {
+    v.innerHTML = `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
+      `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(ALL[id].price*q)}</span></li>`).join("")}</ul>
+      <div class="sum">
+        <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
+        <div><span>Lieferung</span><span>${eur(CONFIG.fee)}</span></div>
+        <div class="tot"><span>Gesamt</span><span>${eur(t.total)}</span></div>
+      </div>`;
+  }
+  document.getElementById("send").disabled = !t.n;
+}
+
+/* Drawer */
+const drawer = document.getElementById("drawer"), scrim = document.getElementById("scrim");
+function openCart(){ drawer.classList.add("open"); scrim.classList.add("open"); drawer.setAttribute("aria-hidden","false"); document.getElementById("dock").classList.remove("show"); document.getElementById("closeCart").focus(); }
+function closeCart(){ drawer.classList.remove("open"); scrim.classList.remove("open"); drawer.setAttribute("aria-hidden","true"); render(); }
+document.getElementById("openCart").onclick = openCart;
+document.getElementById("dockBtn").onclick = openCart;
+document.getElementById("closeCart").onclick = closeCart;
+scrim.onclick = closeCart;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && drawer.classList.contains("open")) closeCart(); });
+
+/* Bestellung */
+function ageOn(dob){
+  const d = new Date(dob), now = new Date();
+  let a = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
+  return a;
+}
+document.getElementById("orderForm").addEventListener("submit", e => {
+  e.preventDefault();
+  const f = e.target, err = document.getElementById("err");
+  const showErr = msg => { err.textContent = msg; err.classList.add("show"); err.scrollIntoView({block:"nearest"}); };
+  err.classList.remove("show");
+  const t = totals();
+  if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
+  if (t.sub < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.sub)}.`);
+  for (const k of ["name","phone","event","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
+  const age = ageOn(f.dob.value);
+  if (t.maxAge === 18 && age < 18) return showErr("Spirituosen und Mischgetränke mit Spirituosen gibt es erst ab 18. Entferne sie aus dem Warenkorb, um zu bestellen.");
+  if (t.maxAge === 16 && age < 16) return showErr("Alkoholische Getränke gibt es erst ab 16.");
+  if (!f.id.checked) return showErr("Bestätige, dass du bei der Übergabe deinen Ausweis zeigst.");
+  if (!f.agb.checked) return showErr("Bitte akzeptiere die AGB.");
+
+  const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(ALL[id].price*q)}`);
+  const msg = [
+    "Neue Bestellung AlkExpress24",
+    "", ...lines, "",
+    `Lieferung: ${eur(CONFIG.fee)}`, `GESAMT: ${eur(t.total)}`, "",
+    `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
+    `Event: ${f.event.value}`, `Treffpunkt: ${f.meet.value}`,
+    `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
+    `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja"
+  ].join("\n");
+
+  const url = CONFIG.whatsapp
+    ? `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`
+    : `mailto:${CONFIG.email}?subject=${encodeURIComponent("Bestellung AlkExpress24")}&body=${encodeURIComponent(msg)}`;
+  window.location.href = url;
+});
+if (!CONFIG.whatsapp) document.getElementById("send").textContent = "Bestellung per E-Mail senden";
+
+/* Altersabfrage beim ersten Besuch */
+const gate = document.getElementById("gate");
+if (!store.get("ae24_16")) gate.showModal();
+document.getElementById("gateYes").onclick = () => { store.set("ae24_16", true); gate.close(); };
+document.getElementById("gateNo").onclick = () => {
+  gate.querySelector("h2").textContent = "Dann leider noch nicht.";
+  gate.querySelector("p").textContent = "Alkoholische Getränke dürfen in der Steiermark erst ab 16 erworben werden, Spirituosen ab 18. Komm gern wieder, wenn's so weit ist.";
+  gate.querySelector(".row").remove();
+};
+gate.addEventListener("cancel", e => e.preventDefault());
+
+/* Rechtstexte */
+const I = CONFIG.impressum;
+const LEGAL = {
+  impressum: `<h2>Impressum</h2>
+    <p>Informationspflicht laut § 5 ECG und § 25 MedienG</p>
+    <h3>Anbieter</h3><p>${I.name}<br>${I.address}<br>E-Mail: ${I.email}<br>Telefon: ${I.phone}</p>
+    <h3>Unternehmen</h3><p>Gewerbe: ${I.gewerbe}<br>UID: ${I.uid}<br>Mitglied der ${I.kammer}<br>Anwendbare Rechtsvorschrift: Gewerbeordnung, abrufbar unter ris.bka.gv.at</p>`,
+  agb: `<h2>AGB</h2>
+    <h3>Geltungsbereich</h3><p>Diese Bedingungen gelten für alle Bestellungen bei AlkExpress24 (${I.name}).</p>
+    <h3>Vertragsabschluss</h3><p>Mit dem Absenden machst du ein Angebot. Der Vertrag kommt zustande, wenn wir die Bestellung per WhatsApp oder E-Mail bestätigen.</p>
+    <h3>Jugendschutz</h3><p>Alkoholische Getränke werden nur an Personen ab 16 Jahren, Spirituosen und spirituosenhaltige Getränke nur ab 18 Jahren übergeben. Die Übergabe erfolgt ausschließlich gegen Vorlage eines amtlichen Lichtbildausweises an die bestellende Person. Wird kein Ausweis vorgelegt, das Mindestalter nicht erreicht oder ist die Person erkennbar alkoholisiert, verweigern wir die Übergabe; die Liefergebühr wird in diesem Fall verrechnet.</p>
+    <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt., zzgl. Liefergebühr. Zahlung bar oder mit Karte bei Übergabe.</p>
+    <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
+  datenschutz: `<h2>Datenschutz</h2>
+    <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt und Geburtsdatum ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
+    <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`
+};
+const legalDlg = document.getElementById("legalDlg");
+document.addEventListener("click", e => {
+  const k = e.target.dataset && e.target.dataset.legal;
+  if (!k) return;
+  e.preventDefault();
+  document.getElementById("legalBody").innerHTML = LEGAL[k];
+  legalDlg.showModal();
+});
+document.getElementById("legalClose").onclick = () => legalDlg.close();
+
+render();
+</script>
+</body>
+</html>
