@@ -78,6 +78,7 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .items{list-style:none;margin:0;padding:0}
 .item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .item .nm{font-weight:700}
+.item .nm .tag{font-size:12px;padding:2px 8px;margin-left:4px;vertical-align:2px}
 .item .sz{color:var(--muted);font-size:15px}
 .item .right{display:flex;align-items:center;gap:14px}
 .price{font-variant-numeric:tabular-nums;font-weight:700;min-width:64px;text-align:right}
@@ -269,30 +270,45 @@ const CONFIG = {
     kammer: "Wirtschaftskammer Steiermark"
   }
 };
-/* Sortiment: age 16 = Bier/Wein/Sekt, 18 = Spirituosen. Beispielpreise. */
+/* Sortiment: age 16 = Bier/Wein/Sekt, 18 = Spirituosen. Richtpreise inkl. USt. – anpassen.
+   Einzelne Produkte können ein eigenes "age" haben (z. B. Pakete). */
 const CATALOG = [
+  { title:"Pakete", age:0, items:[
+    {id:"p1", name:"Vorglüh-Paket", size:"Vodka 0,7 l + 4 Red Bull + 10 Becher", price:29.9, age:18},
+    {id:"p2", name:"Bier-Box", size:"6 × Puntigamer 0,5 l + Chips", price:15.9, age:16},
+    {id:"p3", name:"Prosecco-Duo", size:"2 × Prosecco 0,75 l + 6 Becher", price:24.9, age:16},
+  ]},
   { title:"Bier & Cider", age:16, items:[
-    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:2.4},
-    {id:"b2", name:"Gösser Märzen", size:"Dose 0,5 l", price:2.6},
-    {id:"b3", name:"Bier 6er-Pack", size:"6 × 0,5 l", price:12.9},
-    {id:"b4", name:"Cider Apfel", size:"Flasche 0,33 l", price:3.2},
+    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:2.5},
+    {id:"b2", name:"Gösser Märzen", size:"Dose 0,5 l", price:2.7},
+    {id:"b3", name:"Puntigamer 6er-Pack", size:"6 × 0,5 l", price:13.9},
+    {id:"b4", name:"Radler Zitrone", size:"Dose 0,5 l", price:2.7},
+    {id:"b5", name:"Cider Apfel", size:"Dose 0,5 l", price:3.4},
   ]},
   { title:"Wein & Sekt", age:16, items:[
-    {id:"w1", name:"Prosecco", size:"Flasche 0,75 l", price:11.9},
-    {id:"w2", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.4},
-    {id:"w3", name:"Welschriesling Steiermark", size:"Flasche 0,75 l", price:12.9},
+    {id:"w1", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.5},
+    {id:"w2", name:"Hugo", size:"Dose 0,33 l", price:3.5},
+    {id:"w3", name:"Piccolo Sekt", size:"Flasche 0,2 l", price:3.9},
+    {id:"w4", name:"Prosecco", size:"Flasche 0,75 l", price:12.9},
   ]},
   { title:"Spirituosen & Mischgetränke", age:18, items:[
-    {id:"s1", name:"Vodka", size:"Flasche 0,7 l", price:19.9},
-    {id:"s2", name:"Jägermeister", size:"Flasche 0,7 l", price:22.9},
-    {id:"s3", name:"Gin", size:"Flasche 0,7 l", price:27.9},
-    {id:"s4", name:"Vodka-Energy Fertigmix", size:"Dose 0,33 l", price:3.9},
+    {id:"s1", name:"Vodka", size:"Flasche 0,7 l", price:21.9},
+    {id:"s2", name:"Jägermeister", size:"Flasche 0,35 l", price:13.9},
+    {id:"s3", name:"Jägermeister", size:"Flasche 0,7 l", price:24.9},
+    {id:"s4", name:"Gin", size:"Flasche 0,7 l", price:27.9},
+    {id:"s5", name:"Vodka-Energy", size:"Dose 0,33 l", price:3.9},
+    {id:"s6", name:"Gin Tonic", size:"Dose 0,33 l", price:3.9},
+    {id:"s7", name:"Cuba Libre", size:"Dose 0,33 l", price:3.9},
   ]},
-  { title:"Ohne Alkohol", age:0, items:[
-    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.2},
-    {id:"n2", name:"Cola", size:"Flasche 0,5 l", price:2.0},
-    {id:"n3", name:"Mineralwasser", size:"Flasche 0,5 l", price:1.5},
-    {id:"n4", name:"Becher 10 Stück", size:"Mehrweg", price:2.0},
+  { title:"Ohne Alkohol & Zubehör", age:0, items:[
+    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.3},
+    {id:"n2", name:"Cola", size:"Flasche 0,5 l", price:2.2},
+    {id:"n3", name:"Tonic Water", size:"Flasche 0,5 l", price:2.4},
+    {id:"n4", name:"Orangensaft", size:"Packung 1 l", price:2.9},
+    {id:"n5", name:"Mineralwasser", size:"Flasche 0,5 l", price:1.5},
+    {id:"n6", name:"Becher", size:"10 Stück", price:1.5},
+    {id:"n7", name:"Eiswürfel", size:"Beutel 2 kg", price:3.5},
+    {id:"n8", name:"Chips", size:"Packung 150 g", price:2.5},
   ]},
 ];
 /* ======================================================= */
@@ -302,7 +318,7 @@ const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
-const ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:c.age}])));
+const ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:i.age ?? c.age}])));
 let cart = store.get("ae24_cart") || {};
 for (const id in cart) if (!ALL[id]) delete cart[id];
 
@@ -322,7 +338,7 @@ cat.innerHTML = CATALOG.map(c => `
     <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>
     <ul class="items">${c.items.map(i => `
       <li class="item">
-        <div><div class="nm">${i.name}</div><div class="sz">${i.size}</div></div>
+        <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}</div></div>
         <div class="right">
           <span class="price">${eur(i.price)}</span>
           <div class="step" role="group" aria-label="Menge ${i.name}">
