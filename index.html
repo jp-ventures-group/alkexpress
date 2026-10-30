@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>AlkExpress24 – Drinks zum Event in Graz</title>
-<meta name="description" content="AlkExpress24: Getränke online bestellen und in wenigen Minuten zu deinem Event in Graz geliefert bekommen. Ausweiskontrolle bei jeder Übergabe.">
+<title>AlkExpress – Drinks zum Event in Graz</title>
+<meta name="description" content="AlkExpress: Getränke online bestellen und in wenigen Minuten zu deinem Event in Graz geliefert bekommen. Ausweiskontrolle bei jeder Übergabe.">
 <meta name="theme-color" content="#1E1B4B">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -150,7 +150,7 @@ dialog p{margin:0 0 18px}
 
 <header>
   <div class="wrap bar">
-    <a href="#" class="logo">AlkExpress<b>24</b></a>
+    <a href="#" class="logo">Alk<b>Express</b></a>
     <button class="cart-btn" id="openCart" aria-label="Warenkorb öffnen">Warenkorb <span class="n" id="count">0</span></button>
   </div>
 </header>
@@ -211,7 +211,7 @@ dialog p{margin:0 0 18px}
       <button data-legal="agb">AGB</button>
       <button data-legal="datenschutz">Datenschutz</button>
     </nav>
-    <div>© <span id="yr"></span> AlkExpress24 · Graz</div>
+    <div>© <span id="yr"></span> AlkExpress · Graz</div>
   </div>
 </footer>
 
@@ -241,7 +241,7 @@ dialog p{margin:0 0 18px}
 
 <dialog id="gate">
   <h2>Bist du mindestens 16?</h2>
-  <p>AlkExpress24 verkauft alkoholische Getränke. Bei der Lieferung prüfen wir deinen Ausweis.</p>
+  <p>AlkExpress verkauft alkoholische Getränke. Bei der Lieferung prüfen wir deinen Ausweis.</p>
   <div class="row">
     <button class="btn1" id="gateYes">Ja, ich bin 16 oder älter</button>
     <button class="btn2" id="gateNo">Nein</button>
@@ -257,7 +257,7 @@ dialog p{margin:0 0 18px}
 /* ============ EINSTELLUNGEN – hier anpassen ============ */
 const CONFIG = {
   whatsapp: "",            // z. B. "43664xxxxxxx" (ohne + und Leerzeichen). Leer = Bestellung per E-Mail
-  email: "bestellung@alkexpress24.at",
+  email: "bestellung@alkexpress.at",
   minOrder: 15,            // Mindestbestellwert in €
   fee: 3.9,                // Liefergebühr in €
   impressum: {             // Pflicht laut ECG/UGB – vor Veröffentlichung ausfüllen!
@@ -424,7 +424,7 @@ document.getElementById("orderForm").addEventListener("submit", e => {
 
   const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(ALL[id].price*q)}`);
   const msg = [
-    "Neue Bestellung AlkExpress24",
+    "Neue Bestellung AlkExpress",
     "", ...lines, "",
     `Lieferung: ${eur(CONFIG.fee)}`, `GESAMT: ${eur(t.total)}`, "",
     `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
@@ -435,7 +435,7 @@ document.getElementById("orderForm").addEventListener("submit", e => {
 
   const url = CONFIG.whatsapp
     ? `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`
-    : `mailto:${CONFIG.email}?subject=${encodeURIComponent("Bestellung AlkExpress24")}&body=${encodeURIComponent(msg)}`;
+    : `mailto:${CONFIG.email}?subject=${encodeURIComponent("Bestellung AlkExpress")}&body=${encodeURIComponent(msg)}`;
   window.location.href = url;
 });
 if (!CONFIG.whatsapp) document.getElementById("send").textContent = "Bestellung per E-Mail senden";
@@ -459,7 +459,7 @@ const LEGAL = {
     <h3>Anbieter</h3><p>${I.name}<br>${I.address}<br>E-Mail: ${I.email}<br>Telefon: ${I.phone}</p>
     <h3>Unternehmen</h3><p>Gewerbe: ${I.gewerbe}<br>UID: ${I.uid}<br>Mitglied der ${I.kammer}<br>Anwendbare Rechtsvorschrift: Gewerbeordnung, abrufbar unter ris.bka.gv.at</p>`,
   agb: `<h2>AGB</h2>
-    <h3>Geltungsbereich</h3><p>Diese Bedingungen gelten für alle Bestellungen bei AlkExpress24 (${I.name}).</p>
+    <h3>Geltungsbereich</h3><p>Diese Bedingungen gelten für alle Bestellungen bei AlkExpress (${I.name}).</p>
     <h3>Vertragsabschluss</h3><p>Mit dem Absenden machst du ein Angebot. Der Vertrag kommt zustande, wenn wir die Bestellung per WhatsApp oder E-Mail bestätigen.</p>
     <h3>Jugendschutz</h3><p>Alkoholische Getränke werden nur an Personen ab 16 Jahren, Spirituosen und spirituosenhaltige Getränke nur ab 18 Jahren übergeben. Die Übergabe erfolgt ausschließlich gegen Vorlage eines amtlichen Lichtbildausweises an die bestellende Person. Wird kein Ausweis vorgelegt, das Mindestalter nicht erreicht oder ist die Person erkennbar alkoholisiert, verweigern wir die Übergabe; die Liefergebühr wird in diesem Fall verrechnet.</p>
     <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt., zzgl. Liefergebühr. Zahlung bar oder mit Karte bei Übergabe.</p>

@@ -1,4 +1,4 @@
-# AlkExpress24
+# AlkExpress
 
 Online-Shop für Getränke-Expresslieferung zu Events in Graz. Statische Seite für GitHub Pages.
 
