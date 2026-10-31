@@ -82,6 +82,7 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .item .sz{color:var(--muted);font-size:15px}
 .item .right{display:flex;align-items:center;gap:14px}
 .price{font-variant-numeric:tabular-nums;font-weight:700;min-width:64px;text-align:right}
+.price .pf{display:block;font-size:12px;font-weight:500;color:var(--muted);white-space:nowrap}
 .step{display:flex;align-items:center;background:var(--ink-2);border-radius:999px;border:1px solid var(--line)}
 .step button{width:38px;height:38px;border:0;background:none;cursor:pointer;font-size:20px;border-radius:999px}
 .step button:hover{background:rgba(255,255,255,.08)}
@@ -183,7 +184,7 @@ dialog p{margin:0 0 18px}
   <section id="sortiment">
     <div class="wrap">
       <h2>Sortiment</h2>
-      <p class="lede">Alles gekühlt. Preise inkl. USt., zzgl. Liefergebühr.</p>
+      <p class="lede">Alles gekühlt. Preise inkl. USt., zzgl. Liefergebühr und 0,25 € Pfand pro Dose bzw. PET-Flasche.</p>
       <div id="catalog"></div>
       <p class="note">Mindestbestellwert <span id="minVal"></span>. Liefergebühr <span id="feeVal"></span>.</p>
     </div>
@@ -228,6 +229,7 @@ dialog p{margin:0 0 18px}
       <label>Event / Ort <input name="event" placeholder="z. B. Orpheum, Uni-Fest Unicorn" required></label>
       <label>Treffpunkt <small>So finden wir dich schnell</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke" required></textarea></label>
       <label>Geburtsdatum <input name="dob" type="date" required></label>
+      <label>Leergut zur Rückgabe <small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
       <label>Zahlung
         <select name="pay"><option>Bar bei Übergabe</option><option>Karte bei Übergabe</option></select>
       </label>
@@ -260,6 +262,7 @@ const CONFIG = {
   email: "bestellung@alkexpress.at",
   minOrder: 15,            // Mindestbestellwert in €
   fee: 3.9,                // Liefergebühr in €
+  pfand: 0.25,             // Einwegpfand je Dose/PET-Flasche (getrennt ausgewiesen, ohne USt.)
   impressum: {             // Pflicht laut ECG/UGB – vor Veröffentlichung ausfüllen!
     name: "[Vor- und Nachname]",
     address: "[Straße Nr., 8010 Graz]",
@@ -274,20 +277,20 @@ const CONFIG = {
    Einzelne Produkte können ein eigenes "age" haben (z. B. Pakete). */
 const CATALOG = [
   { title:"Pakete", age:0, items:[
-    {id:"p1", name:"Vorglüh-Paket", size:"Vodka 0,7 l + 4 Red Bull + 10 Becher", price:29.9, age:18},
-    {id:"p2", name:"Bier-Box", size:"6 × Puntigamer 0,5 l + Chips", price:15.9, age:16},
+    {id:"p1", name:"Vorglüh-Paket", size:"Vodka 0,7 l + 4 Red Bull + 10 Becher", price:29.9, pfand:4, age:18},
+    {id:"p2", name:"Bier-Box", size:"6 × Puntigamer 0,5 l + Chips", price:15.9, pfand:6, age:16},
     {id:"p3", name:"Prosecco-Duo", size:"2 × Prosecco 0,75 l + 6 Becher", price:24.9, age:16},
   ]},
   { title:"Bier & Cider", age:16, items:[
-    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:2.5},
-    {id:"b2", name:"Gösser Märzen", size:"Dose 0,5 l", price:2.7},
-    {id:"b3", name:"Puntigamer 6er-Pack", size:"6 × 0,5 l", price:13.9},
-    {id:"b4", name:"Radler Zitrone", size:"Dose 0,5 l", price:2.7},
-    {id:"b5", name:"Cider Apfel", size:"Dose 0,5 l", price:3.4},
+    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:2.5, pfand:1},
+    {id:"b2", name:"Gösser Märzen", size:"Dose 0,5 l", price:2.7, pfand:1},
+    {id:"b3", name:"Puntigamer 6er-Pack", size:"6 × 0,5 l", price:13.9, pfand:6},
+    {id:"b4", name:"Radler Zitrone", size:"Dose 0,5 l", price:2.7, pfand:1},
+    {id:"b5", name:"Cider Apfel", size:"Dose 0,5 l", price:3.4, pfand:1},
   ]},
   { title:"Wein & Sekt", age:16, items:[
-    {id:"w1", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.5},
-    {id:"w2", name:"Hugo", size:"Dose 0,33 l", price:3.5},
+    {id:"w1", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.5, pfand:1},
+    {id:"w2", name:"Hugo", size:"Dose 0,33 l", price:3.5, pfand:1},
     {id:"w3", name:"Piccolo Sekt", size:"Flasche 0,2 l", price:3.9},
     {id:"w4", name:"Prosecco", size:"Flasche 0,75 l", price:12.9},
   ]},
@@ -296,16 +299,16 @@ const CATALOG = [
     {id:"s2", name:"Jägermeister", size:"Flasche 0,35 l", price:13.9},
     {id:"s3", name:"Jägermeister", size:"Flasche 0,7 l", price:24.9},
     {id:"s4", name:"Gin", size:"Flasche 0,7 l", price:27.9},
-    {id:"s5", name:"Vodka-Energy", size:"Dose 0,33 l", price:3.9},
-    {id:"s6", name:"Gin Tonic", size:"Dose 0,33 l", price:3.9},
-    {id:"s7", name:"Cuba Libre", size:"Dose 0,33 l", price:3.9},
+    {id:"s5", name:"Vodka-Energy", size:"Dose 0,33 l", price:3.9, pfand:1},
+    {id:"s6", name:"Gin Tonic", size:"Dose 0,33 l", price:3.9, pfand:1},
+    {id:"s7", name:"Cuba Libre", size:"Dose 0,33 l", price:3.9, pfand:1},
   ]},
   { title:"Ohne Alkohol & Zubehör", age:0, items:[
-    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.3},
-    {id:"n2", name:"Cola", size:"Flasche 0,5 l", price:2.2},
-    {id:"n3", name:"Tonic Water", size:"Flasche 0,5 l", price:2.4},
+    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.3, pfand:1},
+    {id:"n2", name:"Cola", size:"PET-Flasche 0,5 l", price:2.2, pfand:1},
+    {id:"n3", name:"Tonic Water", size:"PET-Flasche 0,5 l", price:2.4, pfand:1},
     {id:"n4", name:"Orangensaft", size:"Packung 1 l", price:2.9},
-    {id:"n5", name:"Mineralwasser", size:"Flasche 0,5 l", price:1.5},
+    {id:"n5", name:"Mineralwasser", size:"PET-Flasche 0,5 l", price:1.5, pfand:1},
     {id:"n6", name:"Becher", size:"10 Stück", price:1.5},
     {id:"n7", name:"Eiswürfel", size:"Beutel 2 kg", price:3.5},
     {id:"n8", name:"Chips", size:"Packung 150 g", price:2.5},
@@ -340,7 +343,7 @@ cat.innerHTML = CATALOG.map(c => `
       <li class="item">
         <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}</div></div>
         <div class="right">
-          <span class="price">${eur(i.price)}</span>
+          <span class="price">${eur(i.price)}${i.pfand ? `<small class="pf">+ ${eur(i.pfand*CONFIG.pfand)} Pfand</small>` : ""}</span>
           <div class="step" role="group" aria-label="Menge ${i.name}">
             <button type="button" data-dec="${i.id}" aria-label="${i.name} weniger">−</button>
             <output id="q_${i.id}">0</output>
@@ -361,7 +364,12 @@ function totals(){
   const sub = Object.entries(cart).reduce((s,[id,q]) => s + ALL[id].price*q, 0);
   const n = Object.values(cart).reduce((a,b)=>a+b,0);
   const maxAge = Object.keys(cart).reduce((m,id)=>Math.max(m,ALL[id].age),0);
-  return {sub, n, maxAge, total: sub ? sub + CONFIG.fee : 0};
+  const pfandN = Object.entries(cart).reduce((s,[id,q]) => s + (ALL[id].pfand||0)*q, 0);
+  const pfand = pfandN * CONFIG.pfand;
+  const retEl = document.querySelector("[name=leergut]");
+  const retN = Math.min(Math.max(parseInt(retEl && retEl.value) || 0, 0), pfandN);
+  const refund = retN * CONFIG.pfand;
+  return {sub, n, maxAge, pfandN, pfand, retN, refund, total: sub ? sub + CONFIG.fee + pfand - refund : 0};
 }
 
 function render(){
@@ -383,6 +391,8 @@ function render(){
       <div class="sum">
         <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
         <div><span>Lieferung</span><span>${eur(CONFIG.fee)}</span></div>
+        ${t.pfandN ? `<div><span>Pfand (${t.pfandN} × ${eur(CONFIG.pfand)})</span><span>${eur(t.pfand)}</span></div>` : ""}
+        ${t.retN ? `<div><span>Leergut-Rückgabe (${t.retN} ×)</span><span>− ${eur(t.refund)}</span></div>` : ""}
         <div class="tot"><span>Gesamt</span><span>${eur(t.total)}</span></div>
       </div>`;
   }
@@ -407,6 +417,7 @@ function ageOn(dob){
   if (m < 0 || (m === 0 && now.getDate() < d.getDate())) a--;
   return a;
 }
+document.querySelector("[name=leergut]").addEventListener("input", render);
 document.getElementById("orderForm").addEventListener("submit", e => {
   e.preventDefault();
   const f = e.target, err = document.getElementById("err");
@@ -426,7 +437,10 @@ document.getElementById("orderForm").addEventListener("submit", e => {
   const msg = [
     "Neue Bestellung AlkExpress",
     "", ...lines, "",
-    `Lieferung: ${eur(CONFIG.fee)}`, `GESAMT: ${eur(t.total)}`, "",
+    `Lieferung: ${eur(CONFIG.fee)}`,
+    ...(t.pfandN ? [`Pfand: ${t.pfandN} × ${eur(CONFIG.pfand)} = ${eur(t.pfand)}`] : []),
+    ...(t.retN ? [`Leergut-Rückgabe: ${t.retN} Stück = −${eur(t.refund)}`] : []),
+    `GESAMT: ${eur(t.total)}`, "",
     `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
     `Event: ${f.event.value}`, `Treffpunkt: ${f.meet.value}`,
     `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
@@ -462,7 +476,7 @@ const LEGAL = {
     <h3>Geltungsbereich</h3><p>Diese Bedingungen gelten für alle Bestellungen bei AlkExpress (${I.name}).</p>
     <h3>Vertragsabschluss</h3><p>Mit dem Absenden machst du ein Angebot. Der Vertrag kommt zustande, wenn wir die Bestellung per WhatsApp oder E-Mail bestätigen.</p>
     <h3>Jugendschutz</h3><p>Alkoholische Getränke werden nur an Personen ab 16 Jahren, Spirituosen und spirituosenhaltige Getränke nur ab 18 Jahren übergeben. Die Übergabe erfolgt ausschließlich gegen Vorlage eines amtlichen Lichtbildausweises an die bestellende Person. Wird kein Ausweis vorgelegt, das Mindestalter nicht erreicht oder ist die Person erkennbar alkoholisiert, verweigern wir die Übergabe; die Liefergebühr wird in diesem Fall verrechnet.</p>
-    <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt., zzgl. Liefergebühr. Zahlung bar oder mit Karte bei Übergabe.</p>
+    <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt., zzgl. Liefergebühr. Auf Einweggetränkeverpackungen (Dosen, PET-Flaschen) wird das gesetzliche Pfand von 0,25 € je Stück gesondert verrechnet. Leere Pfandgebinde nehmen wir bei der Lieferung zurück und erstatten das Pfand. Zahlung bar oder mit Karte bei Übergabe.</p>
     <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
   datenschutz: `<h2>Datenschutz</h2>
     <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt und Geburtsdatum ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
