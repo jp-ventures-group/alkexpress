@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>AlkExpress Beleg</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,700..800&family=DM+Sans:opsz,wght@9..40,400;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1E1B4B;--paper:#FFFFFF;--muted:#5A5690;--r:#D9342A}
+*{box-sizing:border-box}
+body{margin:0;background:#ECEAF8;color:var(--ink);font-family:"DM Sans",system-ui,sans-serif;font-size:16px;line-height:1.45}
+.slip{max-width:420px;margin:24px auto;background:var(--paper);border-radius:16px;padding:24px 22px;box-shadow:0 6px 24px rgba(30,27,75,.12)}
+.logo{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-stretch:80%;font-size:26px}
+.logo b{color:var(--r)}
+.small{font-size:14px;color:var(--muted)}
+h1{font-family:"Bricolage Grotesque",sans-serif;font-size:20px;margin:18px 0 2px}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-variant-numeric:tabular-nums}
+td{padding:6px 0;border-bottom:1px dashed #D8D5EE;vertical-align:top}
+td.n{text-align:right;white-space:nowrap;padding-left:12px}
+tr.tot td{font-weight:800;font-size:18px;border-bottom:0;border-top:2px solid var(--ink);padding-top:10px}
+.btn{display:block;margin:18px auto 0;border:0;border-radius:999px;padding:12px 20px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;font-size:15px}
+.err{max-width:420px;margin:40px auto;padding:20px;text-align:center}
+@media print{body{background:#fff}.slip{box-shadow:none;margin:0}.btn{display:none}}
+</style>
+</head>
+<body>
+<main id="out"><p class="err">Beleg wird geladen …</p></main>
+<script>
+const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
+const eur = n => Number(n||0).toLocaleString("de-AT",{style:"currency",currency:"EUR"});
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+(async () => {
+  const q = new URLSearchParams(location.search), out = document.getElementById("out");
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/rpc/beleg_abrufen`, { method:"POST",
+      headers:{ apikey: SUPA_KEY, Authorization:`Bearer ${SUPA_KEY}`, "Content-Type":"application/json" },
+      body: JSON.stringify({ b_id: q.get("id"), tok: q.get("t") }) });
+    const b = await r.json();
+    if (!r.ok || !b) throw new Error();
+    const pfStk = b.posten.reduce((s,p)=>s+p.menge*p.pfand_stk,0);
+    const rates = {}; b.posten.forEach(p => rates[p.ust] = (rates[p.ust]||0) + p.menge*p.preis); rates[20] = (rates[20]||0) + Number(b.liefergebuehr);
+    const ust = Object.keys(rates).sort((a,c)=>c-a).map(k => { const g = rates[k], n = g/(1+k/100); return `${k} % USt: ${eur(g-n)} (netto ${eur(n)})`; });
+    document.title = `AlkExpress Beleg Nr. ${b.beleg_nr}`;
+    out.innerHTML = `<div class="slip">
+      <div class="logo">Alk<b>Express</b></div>
+      <div class="small">${esc(b.inhaber)}<br>${esc(b.adresse)}${b.uid ? `<br>UID: ${esc(b.uid)}` : ""}</div>
+      <h1>Beleg Nr. ${b.beleg_nr}</h1>
+      <div class="small">${new Date(b.beleg_am).toLocaleString("de-AT")} · ${esc(b.event||"")}</div>
+      <table>
+        ${b.posten.map(p => `<tr><td>${p.menge} × ${esc(p.name)}<div class="small">à ${eur(p.preis)}</div></td><td class="n">${eur(p.menge*p.preis)}</td></tr>`).join("")}
+        <tr><td>Liefergebühr</td><td class="n">${eur(b.liefergebuehr)}</td></tr>
+        ${Number(b.pfand) ? `<tr><td>Pfand (${pfStk} × Einweg)</td><td class="n">${eur(b.pfand)}</td></tr>` : ""}
+        ${Number(b.pfand_retour) ? `<tr><td>Pfandrückgabe (${b.leergut_stk} Stück)</td><td class="n">− ${eur(b.pfand_retour)}</td></tr>` : ""}
+        <tr class="tot"><td>Gesamt</td><td class="n">${eur(b.gesamt)}</td></tr>
+      </table>
+      <div class="small">Bezahlt: ${b.zahlart === "karte" ? "Karte" : "bar"}</div>
+      <div class="small" style="margin-top:8px">${b.kleinunternehmer ? "Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)." : ust.join("<br>")}</div>
+      <div class="small" style="margin-top:8px">Pfand ist nicht umsatzsteuerpflichtig.</div>
+      <button class="btn" onclick="print()">Drucken oder als PDF speichern</button>
+    </div>`;
+  }catch(e){
+    out.innerHTML = `<p class="err">Dieser Beleg wurde nicht gefunden. Prüf, ob der Link vollständig ist, oder melde dich bei uns.</p>`;
+  }
+})();
+</script>
+</body>
+</html>

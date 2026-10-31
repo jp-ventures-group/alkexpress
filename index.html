@@ -575,30 +575,48 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   await loadStock();
   if (JSON.stringify(cart) !== before) return showErr("Einige Getränke sind inzwischen knapp geworden. Wir haben deinen Warenkorb angepasst, bitte prüf ihn kurz und sende erneut.");
 
+  /* Bestellung in der Datenbank anlegen: Server prüft Event, Umkreis, Bestand und rechnet nach */
+  const send = document.getElementById("send"); send.disabled = true; send.textContent = "Bestellung wird angelegt …";
+  let srv = null, offline = false;
+  try{
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
+      headers:{ ...sbHeaders, "Content-Type":"application/json" },
+      body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
+        lat: LOC.lat, lng: LOC.lng, leergut: t.retN, zahlart: /karte/i.test(f.pay.value) ? "karte" : "bar" } }) });
+    const j = await r.json().catch(() => null);
+    if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel; return showErr(j.message); } else offline = true;
+  }catch(x){ offline = true; }
+  send.disabled = false; send.textContent = sendLabel;
+
   const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(ALL[id].price*q)}`);
+  const total = srv ? Number(srv.gesamt) : t.total;
+  const teamLink = srv ? `${new URL("lager.html", location.href).href}#b=${srv.id}`
+    : `${new URL("lager.html", location.href).href}#order=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({
+      c: cart, n: f.name.value.trim(), p: f.phone.value.trim(), m: f.meet.value.trim(), e: ev.name,
+      t: eur(t.total), g: `${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)}` })))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""))}`;
   const msg = [
-    "Neue Bestellung AlkExpress",
+    srv ? `Neue Bestellung #${srv.nr} AlkExpress` : "Neue Bestellung AlkExpress",
     "", ...lines, "",
     `Lieferung: ${eur(CONFIG.fee)}`,
     ...(t.pfandN ? [`Pfand: ${t.pfandN} × ${eur(CONFIG.pfand)} = ${eur(t.pfand)}`] : []),
     ...(t.retN ? [`Leergut-Rückgabe: ${t.retN} Stück = −${eur(t.refund)}`] : []),
-    `GESAMT: ${eur(t.total)}`, "",
+    `GESAMT: ${eur(total)}`, "",
     `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
     `Event: ${ev.name} (${ev.ort})`, `Treffpunkt: ${f.meet.value}`,
     `Standort: https://maps.google.com/?q=${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)} (${Math.round(LOC.dist)} m von der Location, ±${Math.round(LOC.acc)} m)`,
     `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
     `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja", "",
-    `Bestellung öffnen (für AlkExpress): ${new URL("lager.html", location.href).href}#order=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({
-      c: cart, n: f.name.value.trim(), p: f.phone.value.trim(), m: f.meet.value.trim(), e: ev.name,
-      t: eur(t.total), g: `${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)}` })))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""))}`
+    `Für das AlkExpress-Team: ${teamLink}`
   ].join("\n");
+  if (srv){ cart = {}; render(); }
 
   const url = CONFIG.whatsapp
     ? `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`
     : `mailto:${CONFIG.email}?subject=${encodeURIComponent("Bestellung AlkExpress")}&body=${encodeURIComponent(msg)}`;
   window.location.href = url;
 });
-if (!CONFIG.whatsapp) document.getElementById("send").textContent = "Bestellung per E-Mail senden";
+const sendLabel = CONFIG.whatsapp ? "Bestellung per WhatsApp senden" : "Bestellung per E-Mail senden";
+document.getElementById("send").textContent = sendLabel;
 
 /* Altersabfrage beim ersten Besuch */
 const gate = document.getElementById("gate");
