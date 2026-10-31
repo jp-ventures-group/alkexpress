@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>AlkExpress Lager</title>
+<meta name="theme-color" content="#1E1B4B">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{--ink:#1E1B4B;--ink-2:#2A2665;--paper:#F6F4FF;--muted:#B9B5E6;--y:#FFC83D;--r:#FF5B4F;--g:#4FD6A8;--line:rgba(246,244,255,.14);
+  --display:"Bricolage Grotesque",system-ui,sans-serif;--body:"DM Sans",system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:var(--body);font-size:17px;line-height:1.45}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--y);outline-offset:2px}
+.wrap{max-width:640px;margin:0 auto;padding:0 16px 120px}
+header{position:sticky;top:0;z-index:5;background:rgba(30,27,75,.94);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar{max-width:640px;margin:0 auto;padding:0 16px;height:60px;display:flex;align-items:center;justify-content:space-between}
+.logo{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:21px}
+.logo b{color:var(--r)}
+.ghost{background:none;border:1px solid var(--line);border-radius:999px;padding:7px 14px;cursor:pointer;font-size:15px}
+h1{font-family:var(--display);font-weight:800;font-stretch:78%;font-size:44px;line-height:.95;margin:28px 0 8px}
+h2{font-family:var(--display);font-weight:800;font-stretch:82%;font-size:26px;margin:28px 0 6px}
+.muted{color:var(--muted)}
+.card{background:var(--paper);color:var(--ink);border-radius:20px;padding:20px;margin:18px 0}
+.card h2{margin-top:0;color:var(--ink)}
+label{display:grid;gap:6px;font-weight:700;font-size:15px}
+input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:12px;background:#fff;color:var(--ink);font-size:16px}
+.btn{border:0;border-radius:999px;padding:14px 20px;font-weight:700;cursor:pointer;background:var(--ink);color:var(--paper);font-size:16px}
+.btn.y{background:var(--y);color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.note{border-radius:10px;padding:12px;font-weight:500;margin-top:12px}
+.note.ok{background:#DDF7EE;color:#0E5A42}
+.note.err{background:#FFE4E1;color:#8E1D14}
+.hidden{display:none!important}
+.summary{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 4px}
+.chip{border-radius:999px;padding:5px 12px;font-weight:700;font-size:14px;background:var(--ink-2);border:1px solid var(--line)}
+.chip.low{background:var(--y);color:var(--ink);border-color:transparent}
+.chip.out{background:var(--r);color:#fff;border-color:transparent}
+.grp{margin-top:26px}
+.grp h3{font-family:var(--display);font-size:20px;font-stretch:85%;margin:0 0 4px}
+.row{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.row .nm{font-weight:700}
+.row .meta{font-size:14px;color:var(--muted)}
+.row.low .meta{color:var(--y)}
+.row.out .meta{color:var(--r)}
+.row.off .nm{opacity:.45}
+.ctl{display:flex;align-items:center;gap:6px}
+.ctl button{width:42px;height:42px;border-radius:999px;border:1px solid var(--line);background:var(--ink-2);cursor:pointer;font-size:20px}
+.ctl input{width:58px;height:42px;text-align:center;border-radius:10px;border:1px solid var(--line);background:var(--ink-2);font-weight:700;font-variant-numeric:tabular-nums}
+.tog{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:500}
+.tog input{width:18px;height:18px}
+.lines{list-style:none;margin:10px 0 16px;padding:0}
+.lines li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E1DEF7}
+.lines .warn{color:#B4231A;font-weight:700}
+.save{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:6}
+.save .btn{width:100%;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+</style>
+</head>
+<body>
+<header><div class="bar"><div class="logo">Alk<b>Express</b> Lager</div><button class="ghost hidden" id="logout">Abmelden</button></div></header>
+
+<main class="wrap">
+  <section id="loginView" class="hidden">
+    <h1>Anmelden</h1>
+    <p class="muted">Nur für das AlkExpress-Team. Du bekommst einen Anmeldelink per E-Mail.</p>
+    <div class="card">
+      <form id="loginForm">
+        <label>E-Mail <input type="email" name="email" autocomplete="email" required></label>
+        <div style="margin-top:14px"><button class="btn" type="submit">Anmeldelink senden</button></div>
+        <div class="note hidden" id="loginMsg" role="status"></div>
+      </form>
+    </div>
+  </section>
+
+  <section id="appView" class="hidden">
+    <div class="card hidden" id="abbuchCard">
+      <h2>Lieferung abbuchen</h2>
+      <p style="margin:0">Erst nach erfolgreicher Übergabe abbuchen. Bei abgelehnter Übergabe einfach schließen.</p>
+      <ul class="lines" id="abbuchLines"></ul>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn y" id="abbuchBtn">Geliefert, jetzt abbuchen</button>
+        <button class="btn" style="background:none;color:var(--ink);border:1.5px solid var(--ink)" id="abbuchCancel">Nicht geliefert</button>
+      </div>
+      <div class="note hidden" id="abbuchMsg" role="status"></div>
+    </div>
+
+    <h1>Bestand im Auto</h1>
+    <div class="summary" id="summary"></div>
+    <p class="muted" style="font-size:15px;margin:6px 0 0">Ausverkaufte Produkte zeigt der Shop automatisch als „ausverkauft“. „Im Shop“ aus = ganz ausblenden.</p>
+    <div id="list"></div>
+    <div class="note err hidden" id="appMsg" role="alert"></div>
+  </section>
+
+  <section id="denyView" class="hidden">
+    <h1>Kein Zugriff</h1>
+    <p class="muted">Dieses Konto ist nicht als Admin freigeschaltet.</p>
+  </section>
+</main>
+
+<div class="save hidden" id="saveBar"><button class="btn y" id="saveBtn">Änderungen speichern</button></div>
+
+<script>
+const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
+const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+const GROUPS = [["p","Pakete"],["b","Bier & Cider"],["w","Wein & Sekt"],["s","Spirituosen & Mischgetränke"],["n","Ohne Alkohol & Zubehör"]];
+const $ = id => document.getElementById(id);
+let rows = [], edits = {};
+
+/* Abbuch-Auftrag aus dem WhatsApp-Link merken, bevor der Login die URL ändert */
+(function(){
+  const m = location.hash.match(/abbuchen=([^&]+)/);
+  if (m){ try{ sessionStorage.setItem("ae_abbuchen", decodeURIComponent(m[1])); }catch(e){} }
+})();
+function pendingAbbuch(){ try{ return JSON.parse(sessionStorage.getItem("ae_abbuchen")||"null"); }catch(e){ return null; } }
+function clearAbbuch(){ try{ sessionStorage.removeItem("ae_abbuchen"); }catch(e){} history.replaceState(null,"",location.pathname); }
+
+function show(view){ for (const v of ["loginView","appView","denyView"]) $(v).classList.toggle("hidden", v!==view); $("logout").classList.toggle("hidden", view==="loginView"); }
+function note(el, msg, ok){ el.textContent = msg; el.className = "note " + (ok ? "ok" : "err"); }
+
+$("loginForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const email = e.target.email.value.trim();
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:true } });
+  if (error) note($("loginMsg"), "Anmeldelink konnte nicht gesendet werden: " + error.message);
+  else note($("loginMsg"), "Link gesendet. Öffne die E-Mail auf diesem Gerät und tipp auf den Link.", true);
+});
+$("logout").onclick = async () => { await sb.auth.signOut(); show("loginView"); };
+
+async function start(){
+  const { data:{ session } } = await sb.auth.getSession();
+  if (!session) return show("loginView");
+  const { data: admin } = await sb.rpc("is_admin");
+  if (!admin) return show("denyView");
+  show("appView");
+  await load();
+  renderAbbuch();
+}
+
+async function load(){
+  const { data, error } = await sb.from("lager").select("*").order("id");
+  if (error){ note($("appMsg"), "Bestand konnte nicht geladen werden: " + error.message); return; }
+  rows = data; edits = {}; renderList();
+}
+
+function cur(r){ return Object.assign({}, r, edits[r.id]||{}); }
+function setEdit(id, patch){
+  const base = rows.find(r => r.id===id);
+  const next = Object.assign({}, edits[id]||{}, patch);
+  for (const k in next) if (next[k] === base[k]) delete next[k];
+  if (Object.keys(next).length) edits[id] = next; else delete edits[id];
+  renderList();
+}
+
+function renderList(){
+  const all = rows.map(cur);
+  const out = all.filter(r => r.aktiv && r.bestand===0).length;
+  const low = all.filter(r => r.aktiv && r.bestand>0 && r.bestand<=Math.max(r.mindest,3)).length;
+  const units = all.reduce((s,r)=>s+r.bestand,0);
+  $("summary").innerHTML = `<span class="chip">${units} Stück gesamt</span>` +
+    (low ? `<span class="chip low">${low} knapp</span>` : "") + (out ? `<span class="chip out">${out} ausverkauft</span>` : "");
+  $("list").innerHTML = GROUPS.map(([p,title]) => {
+    const g = all.filter(r => r.id.startsWith(p));
+    if (!g.length) return "";
+    return `<div class="grp"><h3>${title}</h3>${g.map(r => {
+      const cls = !r.aktiv ? "off" : r.bestand===0 ? "out" : r.bestand<=Math.max(r.mindest,3) ? "low" : "";
+      const meta = !r.aktiv ? "im Shop ausgeblendet" : r.bestand===0 ? "ausverkauft" : r.bestand<=Math.max(r.mindest,3) ? "knapp" : "verfügbar";
+      return `<div class="row ${cls}">
+        <div><div class="nm">${r.name}</div><div class="meta">${meta}${edits[r.id] ? " · geändert" : ""}</div>
+          <label class="tog"><input type="checkbox" data-act="aktiv" data-id="${r.id}" ${r.aktiv?"checked":""}> Im Shop</label></div>
+        <div class="ctl" role="group" aria-label="Bestand ${r.name}">
+          <button type="button" data-act="dec" data-id="${r.id}" aria-label="${r.name} weniger">−</button>
+          <input type="number" min="0" inputmode="numeric" data-act="set" data-id="${r.id}" value="${r.bestand}" aria-label="Bestand ${r.name}">
+          <button type="button" data-act="inc" data-id="${r.id}" aria-label="${r.name} mehr">+</button>
+        </div></div>`; }).join("")}</div>`;
+  }).join("");
+  const n = Object.keys(edits).length;
+  $("saveBar").classList.toggle("hidden", !n);
+  $("saveBtn").textContent = n === 1 ? "1 Änderung speichern" : `${n} Änderungen speichern`;
+}
+
+$("list").addEventListener("click", e => {
+  const b = e.target.closest("button[data-act]"); if (!b) return;
+  const r = cur(rows.find(x => x.id===b.dataset.id));
+  setEdit(r.id, { bestand: Math.max(0, r.bestand + (b.dataset.act==="inc" ? 1 : -1)) });
+});
+$("list").addEventListener("change", e => {
+  const t = e.target; if (!t.dataset.act) return;
+  if (t.dataset.act==="set") setEdit(t.dataset.id, { bestand: Math.max(0, parseInt(t.value)||0) });
+  if (t.dataset.act==="aktiv") setEdit(t.dataset.id, { aktiv: t.checked });
+});
+
+$("saveBtn").onclick = async () => {
+  $("saveBtn").disabled = true;
+  const ids = Object.keys(edits);
+  for (const id of ids){
+    const { error } = await sb.from("lager").update(edits[id]).eq("id", id);
+    if (error){ note($("appMsg"), `Speichern von ${id} fehlgeschlagen: ${error.message}`); break; }
+  }
+  $("saveBtn").disabled = false;
+  await load();
+};
+
+function renderAbbuch(){
+  const p = pendingAbbuch();
+  if (!p || !Object.keys(p).length){ $("abbuchCard").classList.add("hidden"); return; }
+  $("abbuchCard").classList.remove("hidden");
+  $("abbuchLines").innerHTML = Object.entries(p).map(([id,q]) => {
+    const r = rows.find(x => x.id===id);
+    const name = r ? r.name : id;
+    const warn = r && r.bestand < q ? ` <span class="warn">(nur ${r.bestand} im Bestand)</span>` : "";
+    return `<li><span>${q} × ${name}${warn}</span><span>${r ? `${r.bestand} → ${Math.max(r.bestand-q,0)}` : ""}</span></li>`;
+  }).join("");
+}
+$("abbuchBtn").onclick = async () => {
+  $("abbuchBtn").disabled = true;
+  const { error } = await sb.rpc("abbuchen", { posten: pendingAbbuch() });
+  $("abbuchBtn").disabled = false;
+  if (error) return note($("abbuchMsg"), "Abbuchen fehlgeschlagen: " + error.message);
+  clearAbbuch(); await load();
+  note($("abbuchMsg"), "Abgebucht. Der Shop zeigt den neuen Bestand.", true);
+  $("abbuchLines").innerHTML = ""; $("abbuchBtn").classList.add("hidden"); $("abbuchCancel").textContent = "Schließen";
+};
+$("abbuchCancel").onclick = () => { clearAbbuch(); $("abbuchCard").classList.add("hidden"); };
+
+sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") start(); });
+start();
+</script>
+</body>
+</html>

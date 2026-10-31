@@ -78,6 +78,10 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .items{list-style:none;margin:0;padding:0}
 .item{display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}
 .item .nm{font-weight:700}
+.item.sold .nm,.item.sold .price{opacity:.45}
+.item .stk{color:var(--band16);font-weight:700}
+.item.sold .stk{color:var(--band18)}
+.step button:disabled{opacity:.3;cursor:not-allowed}
 .item .nm .tag{font-size:12px;padding:2px 8px;margin-left:4px;vertical-align:2px}
 .item .sz{color:var(--muted);font-size:15px}
 .item .right{display:flex;align-items:center;gap:14px}
@@ -262,6 +266,8 @@ const CONFIG = {
   email: "bestellung@alkexpress.at",
   minOrder: 15,            // Mindestbestellwert in €
   fee: 3.9,                // Liefergebühr in €
+  supabaseUrl: "https://smjspmfvdjvyohpoqxgl.supabase.co",
+  supabaseKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak", // öffentlicher Schlüssel, nur Lesen erlaubt
   pfand: 0.25,             // Einwegpfand je Dose/PET-Flasche (getrennt ausgewiesen, ohne USt.)
   impressum: {             // Pflicht laut ECG/UGB – vor Veröffentlichung ausfüllen!
     name: "[Vor- und Nachname]",
@@ -334,14 +340,30 @@ document.getElementById("yr").textContent = new Date().getFullYear();
 document.getElementById("minVal").textContent = eur(CONFIG.minOrder);
 document.getElementById("feeVal").textContent = eur(CONFIG.fee);
 
+/* Live-Lagerbestand aus Supabase (null = unbekannt, dann ist alles bestellbar) */
+let STOCK = null;
+async function loadStock(){
+  try{
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/lager?select=id,bestand,aktiv`, {
+      headers:{ apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` }, cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const rows = await r.json();
+    // Lager noch nie befüllt (alles 0)? Dann Bestand ignorieren, sonst wäre alles „ausverkauft“.
+    STOCK = rows.some(x => x.bestand > 0) ? Object.fromEntries(rows.map(x => [x.id, x.aktiv ? x.bestand : 0])) : null;
+  }catch(e){ /* offline oder nicht erreichbar: ohne Bestandsanzeige weiter */ }
+  render();
+  return STOCK;
+}
+const avail = id => (STOCK && id in STOCK) ? STOCK[id] : Infinity;
+
 /* Katalog rendern */
 const cat = document.getElementById("catalog");
 cat.innerHTML = CATALOG.map(c => `
   <div class="cat">
     <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>
     <ul class="items">${c.items.map(i => `
-      <li class="item">
-        <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}</div></div>
+      <li class="item" id="it_${i.id}">
+        <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}<span class="stk" id="stk_${i.id}"></span></div></div>
         <div class="right">
           <span class="price">${eur(i.price)}${i.pfand ? `<small class="pf">+ ${eur(i.pfand*CONFIG.pfand)} Pfand</small>` : ""}</span>
           <div class="step" role="group" aria-label="Menge ${i.name}">
@@ -355,7 +377,7 @@ cat.innerHTML = CATALOG.map(c => `
 
 cat.addEventListener("click", e => {
   const inc = e.target.dataset.inc, dec = e.target.dataset.dec;
-  if (inc) cart[inc] = (cart[inc]||0) + 1;
+  if (inc && (cart[inc]||0) < avail(inc)) cart[inc] = (cart[inc]||0) + 1;
   if (dec && cart[dec]) { cart[dec]--; if (!cart[dec]) delete cart[dec]; }
   if (inc || dec) render();
 });
@@ -374,7 +396,15 @@ function totals(){
 
 function render(){
   store.set("ae24_cart", cart);
-  for (const id in ALL) document.getElementById("q_"+id).textContent = cart[id]||0;
+  for (const id in ALL){
+    const a = avail(id);
+    if (cart[id] > a){ if (a > 0) cart[id] = a; else delete cart[id]; }
+    document.getElementById("q_"+id).textContent = cart[id]||0;
+    const li = document.getElementById("it_"+id), stk = document.getElementById("stk_"+id);
+    li.classList.toggle("sold", a === 0);
+    li.querySelector("[data-inc]").disabled = (cart[id]||0) >= a;
+    stk.textContent = a === 0 ? " · ausverkauft" : (a <= 3 ? ` · nur noch ${a}` : "");
+  }
   const t = totals();
   document.getElementById("count").textContent = t.n;
   const dock = document.getElementById("dock");
@@ -418,7 +448,7 @@ function ageOn(dob){
   return a;
 }
 document.querySelector("[name=leergut]").addEventListener("input", render);
-document.getElementById("orderForm").addEventListener("submit", e => {
+document.getElementById("orderForm").addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target, err = document.getElementById("err");
   const showErr = msg => { err.textContent = msg; err.classList.add("show"); err.scrollIntoView({block:"nearest"}); };
@@ -433,6 +463,10 @@ document.getElementById("orderForm").addEventListener("submit", e => {
   if (!f.id.checked) return showErr("Bestätige, dass du bei der Übergabe deinen Ausweis zeigst.");
   if (!f.agb.checked) return showErr("Bitte akzeptiere die AGB.");
 
+  const before = JSON.stringify(cart);
+  await loadStock();
+  if (JSON.stringify(cart) !== before) return showErr("Einige Getränke sind inzwischen knapp geworden. Wir haben deinen Warenkorb angepasst, bitte prüf ihn kurz und sende erneut.");
+
   const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(ALL[id].price*q)}`);
   const msg = [
     "Neue Bestellung AlkExpress",
@@ -444,7 +478,8 @@ document.getElementById("orderForm").addEventListener("submit", e => {
     `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
     `Event: ${f.event.value}`, `Treffpunkt: ${f.meet.value}`,
     `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
-    `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja"
+    `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja", "",
+    `Nach Übergabe abbuchen: ${new URL("lager.html", location.href).href}#abbuchen=${encodeURIComponent(JSON.stringify(cart))}`
   ].join("\n");
 
   const url = CONFIG.whatsapp
@@ -493,6 +528,9 @@ document.addEventListener("click", e => {
 document.getElementById("legalClose").onclick = () => legalDlg.close();
 
 render();
+loadStock();
+setInterval(loadStock, 60000);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStock(); });
 </script>
 </body>
 </html>
