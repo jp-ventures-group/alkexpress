@@ -94,6 +94,24 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .note{font-size:14px;color:var(--muted);margin-top:14px}
 
 /* Jugendschutz */
+.status{display:flex;gap:12px;align-items:flex-start;border-radius:16px;padding:14px 16px;margin:0 0 26px;max-width:560px;border:1px solid var(--line);background:var(--ink-2)}
+.status .dot{width:12px;height:12px;border-radius:50%;background:var(--muted);flex:none;margin-top:6px}
+.status.live{background:rgba(79,214,168,.14);border-color:rgba(79,214,168,.5)}
+.status.live .dot{background:var(--go);box-shadow:0 0 0 6px rgba(79,214,168,.2)}
+.status b{display:block;font-size:18px}
+.status span{color:var(--muted);font-size:15px}
+.events{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.events li{display:grid;grid-template-columns:86px 1fr;gap:4px 16px;padding:16px 0;border-bottom:1px solid var(--line)}
+.events .d{font-family:var(--display);font-weight:800;font-stretch:85%;font-size:20px;line-height:1.1;grid-row:span 2}
+.events .d small{display:block;font-family:var(--body);font-weight:500;font-size:14px;color:var(--muted)}
+.events .n{font-weight:700}
+.events .o{color:var(--muted);font-size:15px}
+.events .live{color:var(--go);font-weight:700}
+.empty-ev{color:var(--muted)}
+.loc{display:grid;gap:8px;border:1.5px dashed #CFCBEF;border-radius:var(--r-sm);padding:12px}
+.loc button{justify-self:start;border:0;background:var(--ink);color:var(--paper);border-radius:999px;padding:10px 16px;font-weight:700;cursor:pointer}
+.loc .res{font-size:15px;font-weight:500}
+.loc .res.ok{color:#0E7A57}.loc .res.bad{color:#B4231A}
 .youth{background:var(--paper);color:var(--ink);border-radius:var(--r-lg);padding:32px 24px;display:grid;gap:18px}
 .youth h2{color:var(--ink)}
 .youth p{margin:0;max-width:60ch}
@@ -163,8 +181,9 @@ dialog p{margin:0 0 18px}
 <main>
   <div class="hero">
     <div class="wrap">
+      <div class="status" id="status" role="status"><span class="dot"></span><div><b id="statusTitle">Lieferstatus wird geladen …</b><span id="statusSub"></span></div></div>
       <h1>Drinks zum Event. In 15 Minuten.</h1>
-      <p>Bestell online, sag uns wo du bist, und wir bringen dir die Getränke zu Fuß ans Event in Graz. Ausweis bereithalten.</p>
+      <p>Wir liefern nur bei ausgewählten Events in Graz, direkt vor die Location. Bestell online, wir bringen's dir zu Fuß. Ausweis bereithalten.</p>
       <a class="cta" href="#sortiment">Getränke auswählen</a>
     </div>
     <div class="bands" aria-hidden="true">
@@ -173,12 +192,20 @@ dialog p{margin:0 0 18px}
     </div>
   </div>
 
+  <section id="events">
+    <div class="wrap">
+      <h2>Hier liefern wir</h2>
+      <p class="lede">Bestellen kannst du nur während der Lieferzeit und nur, wenn du in der Nähe der Location bist.</p>
+      <ul class="events" id="eventList"><li class="empty-ev">Events werden geladen …</li></ul>
+    </div>
+  </section>
+
   <section>
     <div class="wrap">
       <h2>So läuft's</h2>
       <p class="lede">Unser Lieferwagen steht schon in der Nähe der Events. Deshalb geht's so schnell.</p>
       <ol class="steps">
-        <li><span class="k">1</span><h3>Bestellen</h3><p>Getränke auswählen, Treffpunkt beim Event angeben, absenden.</p></li>
+        <li><span class="k">1</span><h3>Bestellen</h3><p>Während eines Events Getränke auswählen, Standort bestätigen und Treffpunkt angeben.</p></li>
         <li><span class="k">2</span><h3>Bestätigung</h3><p>Wir melden uns per WhatsApp mit der Lieferzeit, meist 10–20 Minuten.</p></li>
         <li><span class="k">3</span><h3>Übergabe mit Ausweis</h3><p>Wir prüfen deinen Ausweis und übergeben nur an die Person, die bestellt hat. Bezahlt wird bar oder mit Karte.</p></li>
       </ol>
@@ -230,7 +257,13 @@ dialog p{margin:0 0 18px}
     <form id="orderForm" novalidate>
       <label>Name <input name="name" autocomplete="name" required></label>
       <label>Handynummer <small>für WhatsApp-Rückmeldung</small><input name="phone" type="tel" autocomplete="tel" required></label>
-      <label>Event / Ort <input name="event" placeholder="z. B. Orpheum, Uni-Fest Unicorn" required></label>
+      <label>Event <select name="event" required></select></label>
+      <div class="loc">
+        <strong style="font-size:15px">Standort bestätigen</strong>
+        <small style="color:#5A5690">Wir liefern nur im Umkreis der Location. Dein Standort wird nur für diese Bestellung verwendet.</small>
+        <button type="button" id="locBtn">Meinen Standort prüfen</button>
+        <div class="res" id="locRes" aria-live="polite"></div>
+      </div>
       <label>Treffpunkt <small>So finden wir dich schnell</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke" required></textarea></label>
       <label>Geburtsdatum <input name="dob" type="date" required></label>
       <label>Leergut zur Rückgabe <small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
@@ -356,6 +389,77 @@ async function loadStock(){
 }
 const avail = id => (STOCK && id in STOCK) ? STOCK[id] : Infinity;
 
+/* Events: Lieferung nur während eines Events im Umkreis */
+let EVENTS = [], LOC = null;
+const sbHeaders = { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` };
+const liveEvents = (now = new Date()) => EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) <= now && now < new Date(e.liefer_bis));
+const fmtDay = d => d.toLocaleDateString("de-AT", { weekday:"short", day:"2-digit", month:"2-digit" });
+const fmtTime = d => d.toLocaleTimeString("de-AT", { hour:"2-digit", minute:"2-digit" });
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function distM(a, b, c, d){
+  const R = 6371000, r = x => x * Math.PI / 180;
+  const h = Math.sin(r(c-a)/2)**2 + Math.cos(r(a))*Math.cos(r(c))*Math.sin(r(d-b)/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+async function loadEvents(){
+  try{
+    const since = new Date().toISOString();
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/events?select=*&aktiv=eq.true&liefer_bis=gt.${encodeURIComponent(since)}&order=liefer_von.asc&limit=30`, { headers: sbHeaders, cache:"no-store" });
+    if (!r.ok) throw new Error(r.status);
+    EVENTS = await r.json();
+  }catch(e){ EVENTS = []; }
+  renderEvents();
+}
+function renderEvents(){
+  const now = new Date(), live = liveEvents(now);
+  const upcoming = EVENTS.filter(e => new Date(e.liefer_von) > now);
+  const st = document.getElementById("status");
+  st.classList.toggle("live", live.length > 0);
+  if (live.length){
+    document.getElementById("statusTitle").textContent = live.length === 1 ? `Jetzt live: ${live[0].name}` : `Jetzt live bei ${live.length} Events`;
+    document.getElementById("statusSub").textContent = live.map(e => `${e.ort}, bis ${fmtTime(new Date(e.liefer_bis))} Uhr`).join(" · ");
+  } else if (upcoming.length){
+    const n = upcoming[0], d = new Date(n.liefer_von);
+    document.getElementById("statusTitle").textContent = "Gerade keine Lieferung";
+    document.getElementById("statusSub").textContent = `Nächstes Event: ${n.name}, ${fmtDay(d)} ab ${fmtTime(d)} Uhr`;
+  } else {
+    document.getElementById("statusTitle").textContent = "Gerade keine Lieferung";
+    document.getElementById("statusSub").textContent = "Neue Events kündigen wir auf Instagram an.";
+  }
+  const list = document.getElementById("eventList");
+  list.innerHTML = EVENTS.length ? EVENTS.map(e => {
+    const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), isLive = a <= now && now < b;
+    return `<li><div class="d">${fmtDay(a)}<small>${fmtTime(a)}–${fmtTime(b)}</small></div>
+      <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}</div>
+      <div class="o">${esc(e.ort)} · Lieferung im Umkreis von ${e.radius_m} m</div></li>`;
+  }).join("") : `<li class="empty-ev">Gerade sind keine Events geplant. Folg uns auf Instagram, dann verpasst du das nächste nicht.</li>`;
+  const sel = document.querySelector("[name=event]"), prev = sel.value;
+  sel.innerHTML = live.length ? live.map(e => `<option value="${e.id}">${esc(e.name)} (${esc(e.ort)})</option>`).join("") : `<option value="">Gerade keine Lieferung</option>`;
+  if (live.some(e => e.id === prev)) sel.value = prev;
+  if (LOC && LOC.event !== sel.value) { LOC = null; document.getElementById("locRes").textContent = ""; }
+  render();
+}
+document.getElementById("locBtn").addEventListener("click", () => {
+  const res = document.getElementById("locRes"), sel = document.querySelector("[name=event]");
+  const ev = liveEvents().find(x => x.id === sel.value);
+  if (!ev){ res.className = "res bad"; res.textContent = "Gerade läuft keine Lieferung."; return; }
+  if (!navigator.geolocation){ res.className = "res bad"; res.textContent = "Dein Browser kann den Standort nicht teilen."; return; }
+  res.className = "res"; res.textContent = "Standort wird ermittelt …";
+  navigator.geolocation.getCurrentPosition(p => {
+    const { latitude:lat, longitude:lng, accuracy:acc } = p.coords;
+    const dist = distM(lat, lng, ev.lat, ev.lng);
+    LOC = { event: ev.id, lat, lng, acc, dist };
+    const ok = dist <= ev.radius_m;
+    res.className = "res " + (ok ? "ok" : "bad");
+    res.textContent = ok ? `Passt: Du bist ca. ${Math.round(dist)} m von ${ev.ort} entfernt.`
+                         : `Du bist ca. ${Math.round(dist)} m entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m um ${ev.ort}.`;
+  }, err => {
+    LOC = null; res.className = "res bad";
+    res.textContent = err.code === 1 ? "Standortzugriff abgelehnt. Erlaube ihn in den Browsereinstellungen und versuch es erneut." : "Standort konnte nicht ermittelt werden. Versuch es draußen nochmal.";
+  }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
+});
+document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; });
+
 /* Katalog rendern */
 const cat = document.getElementById("catalog");
 cat.innerHTML = CATALOG.map(c => `
@@ -426,7 +530,7 @@ function render(){
         <div class="tot"><span>Gesamt</span><span>${eur(t.total)}</span></div>
       </div>`;
   }
-  document.getElementById("send").disabled = !t.n;
+  document.getElementById("send").disabled = !t.n || !liveEvents().length;
 }
 
 /* Drawer */
@@ -454,9 +558,13 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   const showErr = msg => { err.textContent = msg; err.classList.add("show"); err.scrollIntoView({block:"nearest"}); };
   err.classList.remove("show");
   const t = totals();
+  const ev = liveEvents().find(x => x.id === f.event.value);
+  if (!ev) return showErr("Gerade läuft keine Lieferung. Schau bei „Hier liefern wir“, wann wir das nächste Mal da sind.");
+  if (!LOC || LOC.event !== ev.id) return showErr("Bitte bestätige zuerst deinen Standort mit „Meinen Standort prüfen“.");
+  if (LOC.dist > ev.radius_m) return showErr(`Du bist ${Math.round(LOC.dist)} m von ${ev.ort} entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m.`);
   if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
   if (t.sub < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.sub)}.`);
-  for (const k of ["name","phone","event","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
+  for (const k of ["name","phone","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
   const age = ageOn(f.dob.value);
   if (t.maxAge === 18 && age < 18) return showErr("Spirituosen und Mischgetränke mit Spirituosen gibt es erst ab 18. Entferne sie aus dem Warenkorb, um zu bestellen.");
   if (t.maxAge === 16 && age < 16) return showErr("Alkoholische Getränke gibt es erst ab 16.");
@@ -476,7 +584,8 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     ...(t.retN ? [`Leergut-Rückgabe: ${t.retN} Stück = −${eur(t.refund)}`] : []),
     `GESAMT: ${eur(t.total)}`, "",
     `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
-    `Event: ${f.event.value}`, `Treffpunkt: ${f.meet.value}`,
+    `Event: ${ev.name} (${ev.ort})`, `Treffpunkt: ${f.meet.value}`,
+    `Standort: https://maps.google.com/?q=${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)} (${Math.round(LOC.dist)} m von der Location, ±${Math.round(LOC.acc)} m)`,
     `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
     `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja", "",
     `Nach Übergabe abbuchen: ${new URL("lager.html", location.href).href}#abbuchen=${encodeURIComponent(JSON.stringify(cart))}`
@@ -514,7 +623,7 @@ const LEGAL = {
     <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt., zzgl. Liefergebühr. Auf Einweggetränkeverpackungen (Dosen, PET-Flaschen) wird das gesetzliche Pfand von 0,25 € je Stück gesondert verrechnet. Leere Pfandgebinde nehmen wir bei der Lieferung zurück und erstatten das Pfand. Zahlung bar oder mit Karte bei Übergabe.</p>
     <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
   datenschutz: `<h2>Datenschutz</h2>
-    <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt und Geburtsdatum ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
+    <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt, Geburtsdatum und – nur wenn du ihn freigibst – deinen aktuellen Standort ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
     <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`
 };
 const legalDlg = document.getElementById("legalDlg");
@@ -529,8 +638,11 @@ document.getElementById("legalClose").onclick = () => legalDlg.close();
 
 render();
 loadStock();
+loadEvents();
+setInterval(renderEvents, 30000);
+setInterval(loadEvents, 300000);
 setInterval(loadStock, 60000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) loadStock(); });
+document.addEventListener("visibilitychange", () => { if (!document.hidden){ loadStock(); loadEvents(); } });
 </script>
 </body>
 </html>

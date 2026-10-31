@@ -57,6 +57,16 @@ input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:12px;bac
 .lines{list-style:none;margin:10px 0 16px;padding:0}
 .lines li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #E1DEF7}
 .lines .warn{color:#B4231A;font-weight:700}
+.ev{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
+.ev .nm{font-weight:700}.ev .meta{font-size:14px;color:var(--muted)}
+.ev.live .meta{color:var(--g)}.ev.off .nm{opacity:.45}
+.ev .acts{display:flex;gap:6px}
+.ev .acts button{border:1px solid var(--line);background:var(--ink-2);border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px}
+.f2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.card input[type=text],.card input[type=date],.card input[type=time],.card select{border:1.5px solid #CFCBEF;border-radius:10px;padding:11px;background:#fff;color:var(--ink);font-size:16px;width:100%}
+.card small{font-weight:400;color:#5A5690}
+.pos{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.pos .btn{padding:10px 14px;font-size:15px}
 .save{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:6}
 .save .btn{width:100%;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 </style>
@@ -94,6 +104,33 @@ input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:12px;bac
     <p class="muted" style="font-size:15px;margin:6px 0 0">Ausverkaufte Produkte zeigt der Shop automatisch als „ausverkauft“. „Im Shop“ aus = ganz ausblenden.</p>
     <div id="list"></div>
     <div class="note err hidden" id="appMsg" role="alert"></div>
+
+    <h1 style="margin-top:44px">Events</h1>
+    <p class="muted" style="font-size:15px;margin:0">Nur während der Lieferzeit eines Events kann im Shop bestellt werden, und nur im eingestellten Umkreis.</p>
+    <div id="evList"></div>
+
+    <div class="card">
+      <h2>Event hinzufügen</h2>
+      <form id="evForm" style="display:grid;gap:12px">
+        <label>Name <input type="text" name="name" placeholder="z. B. Halloween Party" required></label>
+        <label>Location <input type="text" name="ort" placeholder="z. B. Postgarage" required></label>
+        <div class="f2">
+          <label>Datum <input type="date" name="tag" required></label>
+          <label>Umkreis
+            <select name="radius"><option value="50">50 m</option><option value="100" selected>100 m</option><option value="200">200 m</option><option value="300">300 m</option><option value="500">500 m</option></select>
+          </label>
+        </div>
+        <div class="f2">
+          <label>Lieferung ab <input type="time" name="von" value="20:00" required></label>
+          <label>Lieferung bis <small>(nach Mitternacht = Folgetag)</small><input type="time" name="bis" value="23:30" required></label>
+        </div>
+        <label>Position der Location <small>Google-Maps-Link oder Koordinaten einfügen, oder vor Ort deinen Standort übernehmen</small>
+          <input type="text" name="pos" placeholder="z. B. 47.0667, 15.4296" required></label>
+        <div class="pos"><button type="button" class="btn" id="hereBtn">Aktuellen Standort übernehmen</button><span id="posInfo" style="font-size:14px;color:#5A5690"></span></div>
+        <button class="btn y" type="submit">Event speichern</button>
+        <div class="note hidden" id="evMsg" role="status"></div>
+      </form>
+    </div>
   </section>
 
   <section id="denyView" class="hidden">
@@ -141,7 +178,75 @@ async function start(){
   show("appView");
   await load();
   renderAbbuch();
+  await loadEvents();
 }
+
+/* ---------- Events ---------- */
+let events = [];
+const fmtDT = d => d.toLocaleString("de-AT", { weekday:"short", day:"2-digit", month:"2-digit", hour:"2-digit", minute:"2-digit" });
+const fmtT = d => d.toLocaleTimeString("de-AT", { hour:"2-digit", minute:"2-digit" });
+const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+async function loadEvents(){
+  const since = new Date(Date.now() - 7*864e5).toISOString();
+  const { data, error } = await sb.from("events").select("*").gt("liefer_bis", since).order("liefer_von");
+  if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
+  events = data; renderEvents();
+}
+function renderEvents(){
+  const now = new Date();
+  $("evList").innerHTML = events.length ? events.map(e => {
+    const a = new Date(e.liefer_von), b = new Date(e.liefer_bis);
+    const live = e.aktiv && a <= now && now < b, past = b <= now;
+    const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
+    return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
+      <div><div class="nm">${esc(e.name)}</div>
+        <div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div></div>
+      <div class="acts">
+        <button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
+        <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button>
+      </div></div>`;
+  }).join("") : `<p class="muted">Noch keine Events eingetragen.</p>`;
+}
+$("evList").addEventListener("click", async e => {
+  const b = e.target.closest("button[data-ev]"); if (!b) return;
+  const ev = events.find(x => x.id === b.dataset.id);
+  if (b.dataset.ev === "toggle") await sb.from("events").update({ aktiv: !ev.aktiv }).eq("id", ev.id);
+  if (b.dataset.ev === "del"){
+    if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.textContent = "Wirklich löschen?"; return; }
+    await sb.from("events").delete().eq("id", ev.id);
+  }
+  loadEvents();
+});
+function parsePos(t){
+  const m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || t.match(/(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{1,3}\.\d+)/);
+  if (!m) return null;
+  const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
+  return (Math.abs(lat) <= 90 && Math.abs(lng) <= 180) ? { lat, lng } : null;
+}
+$("hereBtn").onclick = () => {
+  $("posInfo").textContent = "Standort wird ermittelt …";
+  navigator.geolocation.getCurrentPosition(p => {
+    $("evForm").pos.value = `${p.coords.latitude.toFixed(6)}, ${p.coords.longitude.toFixed(6)}`;
+    $("posInfo").textContent = `Übernommen (±${Math.round(p.coords.accuracy)} m)`;
+  }, () => { $("posInfo").textContent = "Standort nicht verfügbar. Bitte Koordinaten einfügen."; }, { enableHighAccuracy:true, timeout:15000 });
+};
+$("evForm").pos.addEventListener("input", e => {
+  const p = parsePos(e.target.value);
+  $("posInfo").textContent = e.target.value ? (p ? `Erkannt: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : "Keine Koordinaten erkannt") : "";
+});
+$("evForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target, pos = parsePos(f.pos.value);
+  if (!pos) return note($("evMsg"), "Position nicht erkannt. Füge Koordinaten wie „47.0667, 15.4296“ oder einen Google-Maps-Link ein.");
+  const von = new Date(`${f.tag.value}T${f.von.value}`), bis = new Date(`${f.tag.value}T${f.bis.value}`);
+  if (bis <= von) bis.setDate(bis.getDate() + 1);
+  const { error } = await sb.from("events").insert({ name: f.name.value.trim(), ort: f.ort.value.trim(), lat: pos.lat, lng: pos.lng,
+    radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString() });
+  if (error) return note($("evMsg"), "Speichern fehlgeschlagen: " + error.message);
+  note($("evMsg"), `„${f.name.value.trim()}“ gespeichert. Es erscheint jetzt im Shop.`, true);
+  f.name.value = ""; f.ort.value = ""; f.pos.value = ""; $("posInfo").textContent = "";
+  loadEvents();
+});
 
 async function load(){
   const { data, error } = await sb.from("lager").select("*").order("id");
