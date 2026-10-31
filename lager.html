@@ -67,6 +67,7 @@ input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:12px;bac
 .card small{font-weight:400;color:#5A5690}
 .pos{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .pos .btn{padding:10px 14px;font-size:15px}
+.btn.wa{background:#25D366;color:#0B2E1A;text-decoration:none;display:inline-block;padding:11px 14px;font-size:15px}
 .save{position:fixed;left:12px;right:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:6}
 .save .btn{width:100%;box-shadow:0 10px 30px rgba(0,0,0,.35)}
 </style>
@@ -89,9 +90,25 @@ input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:12px;bac
 
   <section id="appView" class="hidden">
     <div class="card hidden" id="abbuchCard">
-      <h2>Lieferung abbuchen</h2>
-      <p style="margin:0">Erst nach erfolgreicher Übergabe abbuchen. Bei abgelehnter Übergabe einfach schließen.</p>
+      <h2 id="abbuchTitle">Lieferung abbuchen</h2>
+      <div id="orderInfo" class="hidden">
+        <p style="margin:0 0 4px"><strong id="oName"></strong> · <a id="oPhone" href="#"></a></p>
+        <p style="margin:0;font-size:15px" id="oMeet"></p>
+        <p style="margin:4px 0 0;font-size:15px" id="oLoc"></p>
+      </div>
       <ul class="lines" id="abbuchLines"></ul>
+      <p style="margin:-6px 0 14px;font-weight:700" id="oTotal"></p>
+      <div id="waBox" class="hidden" style="display:grid;gap:8px;margin-bottom:16px">
+        <strong style="font-size:15px">Antwort per WhatsApp</strong>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <a class="btn wa" data-wa="confirm" data-min="10" href="#">Bestätigen · 10 Min</a>
+          <a class="btn wa" data-wa="confirm" data-min="20" href="#">Bestätigen · 20 Min</a>
+          <a class="btn wa" data-wa="here" href="#">Bin da</a>
+          <a class="btn wa" data-wa="sold" href="#">Etwas ausverkauft</a>
+        </div>
+        <small style="color:#5A5690">Öffnet WhatsApp mit fertigem Text an die Kundin oder den Kunden. Du musst nur noch senden.</small>
+      </div>
+      <p style="margin:0 0 10px;font-size:15px">Erst nach erfolgreicher Übergabe abbuchen. Bei abgelehnter Übergabe auf „Nicht geliefert“ tippen.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <button class="btn y" id="abbuchBtn">Geliefert, jetzt abbuchen</button>
         <button class="btn" style="background:none;color:var(--ink);border:1.5px solid var(--ink)" id="abbuchCancel">Nicht geliefert</button>
@@ -153,10 +170,19 @@ let rows = [], edits = {};
 /* Abbuch-Auftrag aus dem WhatsApp-Link merken, bevor der Login die URL ändert */
 (function(){
   const m = location.hash.match(/abbuchen=([^&]+)/);
-  if (m){ try{ sessionStorage.setItem("ae_abbuchen", decodeURIComponent(m[1])); }catch(e){} }
+  if (m){ try{ sessionStorage.setItem("ae_abbuchen", decodeURIComponent(m[1])); sessionStorage.removeItem("ae_order"); }catch(e){} }
+  const o = location.hash.match(/order=([^&]+)/);
+  if (o){ try{
+    const b64 = decodeURIComponent(o[1]).replace(/-/g,"+").replace(/_/g,"/");
+    const json = decodeURIComponent(escape(atob(b64)));
+    const ord = JSON.parse(json);
+    sessionStorage.setItem("ae_order", JSON.stringify(ord));
+    sessionStorage.setItem("ae_abbuchen", JSON.stringify(ord.c || {}));
+  }catch(e){} }
 })();
+function pendingOrder(){ try{ return JSON.parse(sessionStorage.getItem("ae_order")||"null"); }catch(e){ return null; } }
 function pendingAbbuch(){ try{ return JSON.parse(sessionStorage.getItem("ae_abbuchen")||"null"); }catch(e){ return null; } }
-function clearAbbuch(){ try{ sessionStorage.removeItem("ae_abbuchen"); }catch(e){} history.replaceState(null,"",location.pathname); }
+function clearAbbuch(){ try{ sessionStorage.removeItem("ae_abbuchen"); sessionStorage.removeItem("ae_order"); }catch(e){} history.replaceState(null,"",location.pathname); }
 
 function show(view){ for (const v of ["loginView","appView","denyView"]) $(v).classList.toggle("hidden", v!==view); $("logout").classList.toggle("hidden", view==="loginView"); }
 function note(el, msg, ok){ el.textContent = msg; el.className = "note " + (ok ? "ok" : "err"); }
@@ -312,10 +338,37 @@ $("saveBtn").onclick = async () => {
   await load();
 };
 
+function waPhone(p){
+  let d = String(p||"").replace(/[^\d+]/g,"");
+  if (d.startsWith("+")) d = d.slice(1); else if (d.startsWith("00")) d = d.slice(2); else if (d.startsWith("0")) d = "43" + d.slice(1);
+  return d.replace(/\D/g,"");
+}
 function renderAbbuch(){
   const p = pendingAbbuch();
   if (!p || !Object.keys(p).length){ $("abbuchCard").classList.add("hidden"); return; }
   $("abbuchCard").classList.remove("hidden");
+  const o = pendingOrder();
+  $("orderInfo").classList.toggle("hidden", !o); $("waBox").classList.toggle("hidden", !o || !o.p);
+  $("abbuchTitle").textContent = o ? "Neue Bestellung" : "Lieferung abbuchen";
+  $("oTotal").textContent = o && o.t ? `Gesamt: ${o.t}` : "";
+  if (o){
+    $("oName").textContent = o.n || "";
+    $("oPhone").textContent = o.p || ""; $("oPhone").href = o.p ? `tel:${o.p}` : "#";
+    $("oMeet").textContent = [o.e, o.m].filter(Boolean).join(" · Treffpunkt: ");
+    $("oLoc").innerHTML = o.g ? `<a href="https://maps.google.com/?q=${encodeURIComponent(o.g)}" target="_blank" rel="noopener">Standort in Google Maps öffnen</a>` : "";
+    const waNum = waPhone(o.p);
+    const items = Object.entries(o.c||{}).map(([id,q]) => { const r = rows.find(x => x.id===id); return `${q}× ${r ? r.name : id}`; }).join(", ");
+    const first = (o.n||"").split(" ")[0];
+    const texts = {
+      confirm: m => `Hi ${first}, danke für deine Bestellung bei AlkExpress! 🍻 Wir sind in ca. ${m} Minuten bei dir (${o.m}). Bitte halte deinen Ausweis bereit. Gesamt: ${o.t}, bar oder Karte.`,
+      here: () => `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`,
+      sold: () => `Hi ${first}, leider ist bei deiner Bestellung (${items}) etwas ausverkauft. Wir melden uns gleich mit einer Alternative, okay?`
+    };
+    document.querySelectorAll("[data-wa]").forEach(a => {
+      const t = a.dataset.wa === "confirm" ? texts.confirm(a.dataset.min) : texts[a.dataset.wa]();
+      a.href = `https://wa.me/${waNum}?text=${encodeURIComponent(t)}`; a.target = "_blank"; a.rel = "noopener";
+    });
+  }
   $("abbuchLines").innerHTML = Object.entries(p).map(([id,q]) => {
     const r = rows.find(x => x.id===id);
     const name = r ? r.name : id;
