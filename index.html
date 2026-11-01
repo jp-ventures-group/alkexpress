@@ -310,6 +310,15 @@ dialog p{margin:0 0 18px}
 </dialog>
 
 <script>
+/* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
+const SITE_VERSION = "2026-11-01-sortiment2";
+fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
+  const m = t.match(/SITE_VERSION = "([^"]+)"/);
+  if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
+    sessionStorage.setItem("ae_site_" + m[1], "1"); location.replace(location.pathname + "?v=" + m[1] + location.hash);
+  }
+}).catch(()=>{});
+
 /* ============ EINSTELLUNGEN – hier anpassen ============ */
 const CONFIG = {
   whatsapp: "",            // z. B. "43664xxxxxxx" (ohne + und Leerzeichen). Leer = Bestellung per E-Mail
