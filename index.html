@@ -113,6 +113,14 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .step button:hover{background:rgba(255,255,255,.08)}
 .step output{min-width:22px;text-align:center;font-variant-numeric:tabular-nums;font-weight:700}
 .note{font-size:14px;color:var(--muted);margin-top:14px}
+.fb{display:grid;gap:14px;max-width:560px}
+.fb-art{display:flex;flex-wrap:wrap;gap:8px}
+.fb-art label{display:flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:8px 14px;cursor:pointer;font-weight:600;font-size:15px}
+.fb-art label:has(input:checked){background:var(--paper);color:var(--ink);border-color:var(--paper)}
+.fb-art input{accent-color:var(--band18)}
+.fb-l{display:grid;gap:6px;font-weight:600;font-size:15px}
+.fb button{justify-self:start;background:var(--paper);color:var(--ink)}
+.fb-msg{margin:0;font-weight:600;min-height:1.4em}
 .faqs{border-top:1px solid var(--line)}
 .faq{border-bottom:1px solid var(--line);padding:14px 0}
 .faq summary{font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px}
@@ -264,6 +272,25 @@ dialog p{margin:0 0 18px}
     </div>
   </section>
 
+  <section id="wunsch">
+    <div class="wrap">
+      <h2>Was fehlt dir?</h2>
+      <p class="lede">Dein Lieblingsgetränk ist nicht dabei oder du hast eine Idee, was wir besser machen können? Sag's uns, wir lesen alles.</p>
+      <form id="fbForm" class="fb" novalidate>
+        <div class="fb-art" role="radiogroup" aria-label="Art">
+          <label><input type="radio" name="art" value="produkt" checked> Getränk wünschen</label>
+          <label><input type="radio" name="art" value="verbesserung"> Verbesserung</label>
+          <label><input type="radio" name="art" value="sonstiges"> Sonstiges</label>
+        </div>
+        <label class="fb-l">Dein Vorschlag<textarea name="text" rows="3" maxlength="600" required placeholder="z. B. Aperol Spritz in der Dose, Corona, Bacardi …"></textarea></label>
+        <label class="fb-l">Kontakt (optional, falls wir antworten sollen)<input name="kontakt" maxlength="120" placeholder="Insta-Name, E-Mail oder Handynummer"></label>
+        <input name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;height:0;width:0;opacity:0">
+        <button class="btn1" type="submit">Vorschlag senden</button>
+        <p class="fb-msg" id="fbMsg" role="status"></p>
+      </form>
+    </div>
+  </section>
+
   <section>
     <div class="wrap">
       <div class="youth">
@@ -337,7 +364,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-01-seo";
+const SITE_VERSION = "2026-11-01-feedback";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -600,6 +627,23 @@ function render(){
   document.getElementById("send").disabled = !t.n || !liveEvents().length;
 }
 
+/* Feedback */
+document.getElementById("fbForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target, msg = document.getElementById("fbMsg"), btn = f.querySelector("button");
+  const text = f.text.value.trim();
+  if (text.length < 3){ msg.textContent = "Bitte schreib kurz, was du dir wünschst."; msg.style.color = "var(--band18)"; return; }
+  btn.disabled = true; msg.textContent = "Wird gesendet …"; msg.style.color = "";
+  try{
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/feedback_senden`, { method:"POST",
+      headers:{ apikey: CONFIG.supabaseKey, Authorization:`Bearer ${CONFIG.supabaseKey}`, "Content-Type":"application/json" },
+      body: JSON.stringify({ p:{ art: f.art.value, text, kontakt: f.kontakt.value.trim(), website: f.website.value } }) });
+    if (!r.ok){ const j = await r.json().catch(()=>({})); throw new Error(j.message || "Fehler"); }
+    f.reset(); msg.textContent = "Danke! Dein Vorschlag ist angekommen. 🍻"; msg.style.color = "var(--go)";
+  }catch(err){ msg.textContent = err.message && err.message !== "Fehler" ? err.message : "Hat nicht geklappt. Bitte versuch es später nochmal."; msg.style.color = "var(--band18)"; }
+  btn.disabled = false;
+});
+
 /* Drawer */
 const drawer = document.getElementById("drawer"), scrim = document.getElementById("scrim");
 function openCart(){ drawer.classList.add("open"); scrim.classList.add("open"); drawer.setAttribute("aria-hidden","false"); document.getElementById("dock").classList.remove("show"); document.getElementById("closeCart").focus(); }
@@ -711,6 +755,7 @@ const LEGAL = {
     <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
   datenschutz: `<h2>Datenschutz</h2>
     <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt, Geburtsdatum und – nur wenn du ihn freigibst – deinen aktuellen Standort ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
+    <p>Feedback-Formular: Deinen Vorschlag und, falls angegeben, deinen Kontakt speichern wir, um das Sortiment zu verbessern und dir gegebenenfalls zu antworten (Art. 6 Abs. 1 lit. f DSGVO). Wir löschen Feedback spätestens nach 12 Monaten.</p>
     <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`
 };
 const legalDlg = document.getElementById("legalDlg");
