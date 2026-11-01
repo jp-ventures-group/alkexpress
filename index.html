@@ -311,7 +311,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-01-klopfer";
+const SITE_VERSION = "2026-11-01-shotrabatt";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -363,11 +363,9 @@ const CATALOG = [
     {id:"s3", name:"Jägermeister", size:"Flasche 0,7 l, verschlossen", price:26.9},
     {id:"s8", name:"Hennessy VS", size:"Flasche 0,7 l, verschlossen", price:49.9},
   ]},
-  { title:"Shots (Minis, verschlossen)", age:18, items:[
+  { title:"Shots (Minis, verschlossen)", age:18, note:"Ab 10 Shots 10 % Rabatt, frei kombinierbar.", items:[
     {id:"m1", name:"Jägermeister Mini", size:"Fläschchen 2 cl", price:3.0},
-    {id:"m2", name:"Jäger-Minis 10er", size:"10 × 2 cl", price:24.9},
-    {id:"m4", name:"Kleiner Klopfer", size:"Fläschchen 2 cl", price:2.5},
-    {id:"m5", name:"Klopfer 10er", size:"10 × 2 cl", price:19.9},
+    {id:"m4", name:"Kleiner Klopfer", size:"Fläschchen 2 cl", price:3.0},
     {id:"m3", name:"Absolut Vodka Mini", size:"Fläschchen 5 cl", price:6.9},
   ]},
   { title:"Zum Mischen", age:0, items:[
@@ -504,7 +502,7 @@ document.querySelector("[name=event]").addEventListener("change", () => { LOC = 
 const cat = document.getElementById("catalog");
 cat.innerHTML = CATALOG.map(c => `
   <div class="cat">
-    <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>
+    <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>${c.note ? `<p class="q" style="margin:-4px 0 8px;color:var(--band16);font-weight:700;font-size:14px">${c.note}</p>` : ""}
     <ul class="items">${c.items.map(i => `
       <li class="item" id="it_${i.id}">
         <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}<span class="stk" id="stk_${i.id}"></span></div></div>
@@ -526,8 +524,12 @@ cat.addEventListener("click", e => {
   if (inc || dec) render();
 });
 
+/* Mengenrabatt: ab 10 Minis (frei kombinierbar) 10 % auf alle Minis. Muss zur Datenbank-Funktion passen. */
+const SHOT_IDS = ["m1","m3","m4"], SHOT_MIN = 10, SHOT_RABATT = 0.10;
+function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
+function unitPrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
 function totals(){
-  const sub = Object.entries(cart).reduce((s,[id,q]) => s + ALL[id].price*q, 0);
+  const sub = Object.entries(cart).reduce((s,[id,q]) => s + unitPrice(id)*q, 0);
   const n = Object.values(cart).reduce((a,b)=>a+b,0);
   const maxAge = Object.keys(cart).reduce((m,id)=>Math.max(m,ALL[id].age),0);
   const pfandN = Object.entries(cart).reduce((s,[id,q]) => s + (ALL[id].pfand||0)*q, 0);
@@ -561,7 +563,8 @@ function render(){
     v.innerHTML = `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
     v.innerHTML = `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
-      `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(ALL[id].price*q)}</span></li>`).join("")}</ul>
+      `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
+      ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
         <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
         <div><span>Lieferung</span><span>${eur(CONFIG.fee)}</span></div>
@@ -628,7 +631,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   }catch(x){ offline = true; }
   send.disabled = false; send.textContent = sendLabel;
 
-  const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(ALL[id].price*q)}`);
+  const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(unitPrice(id)*q)}`);
   const total = srv ? Number(srv.gesamt) : t.total;
   const teamLink = srv ? `${new URL("lager.html", location.href).href}#b=${srv.id}`
     : `${new URL("lager.html", location.href).href}#order=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({
