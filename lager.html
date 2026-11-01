@@ -106,7 +106,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 </style>
 </head>
 <body>
-<header><div class="bar"><div class="logo">Alk<b>Express</b> Team</div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
+<header><div class="bar"><div class="logo">Alk<b>Express</b> Team <small id="ver" style="font-size:10px;opacity:.5;font-weight:500"></small></div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
 <div class="toast hidden" id="toast" role="status"></div>
 
 <main class="wrap">
@@ -282,6 +282,14 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
+/* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
+const APP_VERSION = "2026-11-01-rollen2";
+fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
+  const m = t.match(/APP_VERSION = "([^"]+)"/);
+  if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
+    sessionStorage.setItem("ae_reloaded_" + m[1], "1"); location.replace(location.pathname + "?v=" + m[1] + location.hash);
+  }
+}).catch(()=>{});
 
 const $ = id => document.getElementById(id);
 const eur = n => Number(n||0).toLocaleString("de-AT",{style:"currency",currency:"EUR"});
@@ -343,7 +351,7 @@ async function start(){
   ME = (await sb.rpc("team_name")).data || "";
   ROLE = (await sb.rpc("meine_rolle")).data || "fahrer";
   MY_EVENT = (await sb.rpc("mein_event")).data || null;
-  $("who").textContent = ME + (isChef() ? "" : " · Fahrer");
+  $("who").textContent = ME + (isChef() ? " · Admin" : " · Fahrer"); $("ver").textContent = "v" + APP_VERSION.slice(-7);
   document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
   $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
   show("app"); goTab(isChef() ? (sessionStorage.getItem("ae_tab") || "best") : "best");
