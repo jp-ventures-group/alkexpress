@@ -121,6 +121,7 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .fb-l{display:grid;gap:6px;font-weight:600;font-size:15px}
 .fb button{justify-self:start;background:var(--paper);color:var(--ink)}
 .fb-msg{margin:0;font-weight:600;min-height:1.4em}
+.ok-box{background:rgba(79,214,168,.14);border:1px solid rgba(79,214,168,.5);border-radius:16px;padding:16px;line-height:1.45}
 .faqs{border-top:1px solid var(--line)}
 .faq{border-bottom:1px solid var(--line);padding:14px 0}
 .faq summary{font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px}
@@ -364,7 +365,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-01-feedback";
+const SITE_VERSION = "2026-11-01-nomail";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -591,6 +592,7 @@ function totals(){
   return {sub, n, maxAge, pfandN, pfand, retN, refund, total: sub ? sub + CONFIG.fee + pfand - refund : 0};
 }
 
+let LAST_ORDER = null;
 function render(){
   store.set("ae24_cart", cart);
   for (const id in ALL){
@@ -611,7 +613,14 @@ function render(){
 
   const v = document.getElementById("cartView");
   if (!t.n){
-    v.innerHTML = `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
+    v.innerHTML = LAST_ORDER ? `<div class="ok-box">
+        <div style="font-size:34px;line-height:1">✅</div>
+        <h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.nr} ist eingegangen</h3>
+        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>, bar oder Karte bei der Übergabe.</p>
+        <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er bei „${esc(LAST_ORDER.meet)}“ ist.</p>
+        ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
+      </div>`
+      : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
     v.innerHTML = `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
@@ -698,35 +707,13 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel; return showErr(j.message); } else offline = true;
   }catch(x){ offline = true; }
   send.disabled = false; send.textContent = sendLabel;
+  if (offline || !srv) return showErr("Deine Bestellung konnte gerade nicht gesendet werden. Bitte prüf deine Internetverbindung und tipp nochmal auf „Bestellung abschicken“.");
 
-  const lines = Object.entries(cart).map(([id,q]) => `${q}x ${ALL[id].name} (${ALL[id].size}) – ${eur(unitPrice(id)*q)}`);
-  const total = srv ? Number(srv.gesamt) : t.total;
-  const teamLink = srv ? `${new URL("lager.html", location.href).href}#b=${srv.id}`
-    : `${new URL("lager.html", location.href).href}#order=${encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify({
-      c: cart, n: f.name.value.trim(), p: f.phone.value.trim(), m: f.meet.value.trim(), e: ev.name,
-      t: eur(t.total), g: `${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)}` })))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,""))}`;
-  const msg = [
-    srv ? `Neue Bestellung #${srv.nr} AlkExpress` : "Neue Bestellung AlkExpress",
-    "", ...lines, "",
-    `Lieferung: ${eur(CONFIG.fee)}`,
-    ...(t.pfandN ? [`Pfand: ${t.pfandN} × ${eur(CONFIG.pfand)} = ${eur(t.pfand)}`] : []),
-    ...(t.retN ? [`Leergut-Rückgabe: ${t.retN} Stück = −${eur(t.refund)}`] : []),
-    `GESAMT: ${eur(total)}`, "",
-    `Name: ${f.name.value}`, `Tel: ${f.phone.value}`,
-    `Event: ${ev.name} (${ev.ort})`, `Treffpunkt: ${f.meet.value}`,
-    `Standort: https://maps.google.com/?q=${LOC.lat.toFixed(6)},${LOC.lng.toFixed(6)} (${Math.round(LOC.dist)} m von der Location, ±${Math.round(LOC.acc)} m)`,
-    `Geburtsdatum: ${new Date(f.dob.value).toLocaleDateString("de-AT")}`,
-    `Zahlung: ${f.pay.value}`, "Ausweis wird bei Übergabe gezeigt: ja", "",
-    `Für das AlkExpress-Team: ${teamLink}`
-  ].join("\n");
-  if (srv){ cart = {}; render(); }
-
-  const url = CONFIG.whatsapp
-    ? `https://wa.me/${CONFIG.whatsapp}?text=${encodeURIComponent(msg)}`
-    : `mailto:${CONFIG.email}?subject=${encodeURIComponent("Bestellung AlkExpress")}&body=${encodeURIComponent(msg)}`;
-  window.location.href = url;
+  LAST_ORDER = { nr: srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge };
+  cart = {}; render();
+  document.getElementById("cartView").scrollIntoView({ block:"start" });
 });
-const sendLabel = CONFIG.whatsapp ? "Bestellung per WhatsApp senden" : "Bestellung per E-Mail senden";
+const sendLabel = "Bestellung abschicken";
 document.getElementById("send").textContent = sendLabel;
 
 /* Altersabfrage beim ersten Besuch */
