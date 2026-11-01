@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Disallow: /lager.html
+Disallow: /beleg.html
+
+Sitemap: https://alkexpress.at/sitemap.xml
