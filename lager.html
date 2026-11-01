@@ -299,7 +299,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-01-belegqr";
+const APP_VERSION = "2026-11-01-anrufen";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -450,6 +450,7 @@ function orderDetail(o){
       <h2 style="margin:0">#${o.nr} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
     <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    ${!isChef() && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
@@ -470,7 +471,8 @@ function orderDetail(o){
     <div class="sec">
       <strong style="font-size:15px">1 · Liefern</strong>
       <div class="btns">
-        ${o.fahrer ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da (WhatsApp)</a>`
+        ${o.fahrer ? `<a class="btn y" href="tel:${esc(o.kunde_tel)}">📞 ${esc(first)} anrufen</a>
+          <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da (WhatsApp)</a>`
           : `<button class="btn y" data-claim="${o.id}">Ich liefere diese Bestellung</button>`}
       </div>
     </div>` : ""}
