@@ -197,6 +197,7 @@ dialog p{margin:0 0 18px}
       <h2>Hier liefern wir</h2>
       <p class="lede">Bestellen kannst du nur während der Lieferzeit und nur, wenn du in der Nähe der Location bist.</p>
       <ul class="events" id="eventList"><li class="empty-ev">Events werden geladen …</li></ul>
+      <button type="button" class="btn2" id="evMore" hidden style="margin-top:20px;color:inherit;border-color:currentColor">Alle Events anzeigen</button>
     </div>
   </section>
 
@@ -410,6 +411,11 @@ async function loadEvents(){
   }catch(e){ EVENTS = []; }
   renderEvents();
 }
+const EV_MAX = 4; let EV_ALL = false;
+document.getElementById("evMore").addEventListener("click", () => {
+  EV_ALL = !EV_ALL; renderEvents();
+  if (!EV_ALL) document.getElementById("events").scrollIntoView({behavior:"smooth"});
+});
 function renderEvents(){
   const now = new Date(), live = liveEvents(now);
   const upcoming = EVENTS.filter(e => new Date(e.liefer_von) > now);
@@ -426,8 +432,11 @@ function renderEvents(){
     document.getElementById("statusTitle").textContent = "Gerade keine Lieferung";
     document.getElementById("statusSub").textContent = "Neue Events kündigen wir auf Instagram an.";
   }
-  const list = document.getElementById("eventList");
-  list.innerHTML = EVENTS.length ? EVENTS.map(e => {
+  const list = document.getElementById("eventList"), more = document.getElementById("evMore");
+  const shown = EV_ALL ? EVENTS : EVENTS.slice(0, EV_MAX);
+  more.hidden = EVENTS.length <= EV_MAX;
+  more.textContent = EV_ALL ? "Weniger anzeigen" : `Alle ${EVENTS.length} Events anzeigen`;
+  list.innerHTML = EVENTS.length ? shown.map(e => {
     const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), isLive = a <= now && now < b;
     return `<li><div class="d">${fmtDay(a)}<small>${fmtTime(a)}–${fmtTime(b)}</small></div>
       <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}</div>
