@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 :root{--ink:#1E1B4B;--ink-2:#2A2665;--paper:#F6F4FF;--muted:#B9B5E6;--y:#FFC83D;--r:#FF5B4F;--g:#4FD6A8;--line:rgba(246,244,255,.14);
   --display:"Bricolage Grotesque",system-ui,sans-serif;--body:"DM Sans",system-ui,sans-serif}
@@ -56,6 +57,10 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .ord .s{font-size:14px;color:var(--muted)}
 .ord .a{font-weight:800;font-variant-numeric:tabular-nums;text-align:right}
 .ord.new{border-color:var(--y);box-shadow:0 0 0 3px rgba(255,200,61,.25)}
+.qrwrap{position:fixed;inset:0;z-index:60;background:rgba(14,12,40,.92);display:flex;align-items:center;justify-content:center;padding:20px}
+.qrbox{background:#fff;color:var(--ink);border-radius:24px;padding:22px;max-width:360px;width:100%;text-align:center}
+.qrbox #qrImg{display:flex;justify-content:center;margin:14px 0}
+.qrbox #qrImg img,.qrbox #qrImg canvas{width:260px!important;height:260px!important}
 .badge{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px;font-weight:700;margin-left:6px;vertical-align:2px}
 .st-eingegangen{background:var(--y);color:var(--ink)}
 .st-bestaetigt{background:#8FB5FF;color:var(--ink)}
@@ -110,6 +115,15 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 <body>
 <header><div class="bar"><div class="logo">Alk<b>Express</b> Team <small id="ver" style="font-size:10px;opacity:.5;font-weight:500"></small></div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
 <div class="toast hidden" id="toast" role="status"></div>
+<div class="qrwrap hidden" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
+  <div class="qrbox">
+    <h2 id="qrTitle" style="margin:0">Beleg scannen</h2>
+    <p style="margin:6px 0 0;font-size:15px" id="qrSub"></p>
+    <div id="qrImg"></div>
+    <p style="margin:0 0 14px;font-size:14px;color:#5A5690">Kunde öffnet die Kamera und scannt den Code. Der Beleg öffnet sich und kann gespeichert werden.</p>
+    <button class="btn" id="qrClose" style="width:100%">Fertig</button>
+  </div>
+</div>
 
 <main class="wrap">
   <section id="loginView" class="hidden">
@@ -285,7 +299,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-01-nozoom";
+const APP_VERSION = "2026-11-01-belegqr";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -492,6 +506,7 @@ function orderDetail(o){
     ${o.status==="geliefert" ? `<div class="sec">
       <p style="margin:0"><strong>Beleg Nr. ${o.beleg_nr}</strong> · ${fmtDT(o.beleg_am)}</p>
       <div class="btns">
+        <button class="btn y" data-qr="${o.id}">Beleg als QR-Code zeigen</button>
         <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Danke für deine Bestellung bei AlkExpress! Hier ist dein Beleg Nr. ${o.beleg_nr}: ${belegUrl}`)}">Beleg per WhatsApp senden</a>
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
@@ -515,6 +530,8 @@ $("bestList").addEventListener("click", async e => {
   if (act){ const o = orders.find(x => x.id === act.dataset.id), seq = ["eingegangen","bestaetigt","unterwegs"];
     if (seq.indexOf(act.dataset.act) > seq.indexOf(o.status)) sb.rpc("bestellung_status", { b_id:o.id, neu:act.dataset.act }).then(loadOrders);
     return; }
+  const qr = e.target.closest("[data-qr]");
+  if (qr){ showQr(orders.find(x => x.id === qr.dataset.qr)); return; }
   const claim = e.target.closest("[data-claim]");
   if (claim){ claim.disabled = true;
     const { error } = await sb.rpc("bestellung_status", { b_id: claim.dataset.claim, neu: "unterwegs" });
@@ -535,6 +552,7 @@ $("bestList").addEventListener("click", async e => {
     if (error) return note($("xMsg"), error.message);
     toast(`Erledigt: Beleg Nr. ${data.beleg_nr}, ${eur(data.gesamt)} ${data.zahlart === "bar" ? "bar" : "per Karte"}`);
     await Promise.all([loadOrders(), loadLager()]);
+    showQr(orders.find(x => x.id === data.id) || data);
     return;
   }
   const rej = e.target.closest("[data-reject]");
@@ -548,6 +566,19 @@ $("bestList").addEventListener("click", async e => {
 });
 $("bestList").addEventListener("input", e => { if (e.target.id === "xLeer") updSum(); });
 $("bestList").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-open]")) e.target.click(); });
+
+/* ================= Beleg-QR ================= */
+function belegLink(o){ return new URL(`beleg.html?id=${o.id}&t=${o.token}`, location.href).href; }
+function showQr(o){
+  if (!o || !o.beleg_nr) return;
+  const box = $("qrImg"); box.innerHTML = "";
+  $("qrSub").textContent = `Beleg Nr. ${o.beleg_nr} · ${eur(o.gesamt)}`;
+  if (window.QRCode) new QRCode(box, { text: belegLink(o), width: 520, height: 520, correctLevel: QRCode.CorrectLevel.M });
+  else box.innerHTML = `<p>QR-Code konnte nicht geladen werden. Bitte Beleg per WhatsApp senden.</p>`;
+  $("qrModal").classList.remove("hidden");
+  try{ navigator.wakeLock && navigator.wakeLock.request("screen").then(l => showQr.lock = l).catch(()=>{}); }catch(e){}
+}
+$("qrClose").onclick = () => { $("qrModal").classList.add("hidden"); try{ showQr.lock && showQr.lock.release(); }catch(e){} };
 
 /* ================= Fahrer: Check-in & meine Kasse ================= */
 function renderFahrer(){
