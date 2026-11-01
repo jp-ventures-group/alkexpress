@@ -311,7 +311,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-01-sortiment2";
+const SITE_VERSION = "2026-11-01-minis";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -362,6 +362,11 @@ const CATALOG = [
     {id:"s1", name:"Absolut Vodka", size:"Flasche 0,7 l, verschlossen", price:26.9},
     {id:"s3", name:"Jägermeister", size:"Flasche 0,7 l, verschlossen", price:26.9},
     {id:"s8", name:"Hennessy VS", size:"Flasche 0,7 l, verschlossen", price:49.9},
+  ]},
+  { title:"Shots (Minis, verschlossen)", age:18, items:[
+    {id:"m1", name:"Jägermeister Mini", size:"Fläschchen 2 cl", price:3.0},
+    {id:"m2", name:"Jäger-Minis 10er", size:"10 × 2 cl", price:24.9},
+    {id:"m3", name:"Absolut Vodka Mini", size:"Fläschchen 5 cl", price:6.9},
   ]},
   { title:"Zum Mischen", age:0, items:[
     {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.9, pfand:1},
