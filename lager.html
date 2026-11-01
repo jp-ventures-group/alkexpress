@@ -106,17 +106,18 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 </style>
 </head>
 <body>
-<header><div class="bar"><div class="logo">Alk<b>Express</b> Team</div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
+<header><div class="bar"><div class="logo">Alk<b>Express</b> Team</div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn">Passwort</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
 <div class="toast hidden" id="toast" role="status"></div>
 
 <main class="wrap">
   <section id="loginView" class="hidden">
     <h1>Anmelden</h1>
-    <p class="muted">Nur für das AlkExpress-Team. Du bekommst einen Anmeldelink per E-Mail.</p>
+    <p class="muted">Nur für das AlkExpress-Team.</p>
     <div class="card">
       <form id="loginForm">
         <label>E-Mail <input type="email" name="email" autocomplete="email" required></label>
-        <div style="margin-top:14px"><button class="btn" type="submit">Anmeldelink senden</button></div>
+        <label style="margin-top:10px;display:block">Passwort <input type="password" name="pw" autocomplete="current-password" required></label>
+        <div style="margin-top:14px"><button class="btn" type="submit">Anmelden</button></div>
         <div class="note hidden" id="loginMsg" role="status"></div>
       </form>
     </div>
@@ -303,15 +304,21 @@ const STATUS = { eingegangen:"Neu", bestaetigt:"Bestätigt", unterwegs:"Unterweg
 function show(view){
   for (const v of ["loginView","denyView"]) $(v).classList.toggle("hidden", v!==view);
   const app = view === "app";
-  $("tabs").classList.toggle("hidden", !app); $("logout").classList.toggle("hidden", view==="loginView");
+  $("tabs").classList.toggle("hidden", !app); $("logout").classList.toggle("hidden", view==="loginView"); $("pwBtn").classList.toggle("hidden", !app);
   if (!app) document.querySelectorAll(".tab").forEach(t => t.classList.add("hidden"));
 }
 $("loginForm").addEventListener("submit", async e => {
   e.preventDefault();
-  const { error } = await sb.auth.signInWithOtp({ email: e.target.email.value.trim(), options:{ emailRedirectTo: location.origin + location.pathname, shouldCreateUser:true } });
-  if (error) note($("loginMsg"), "Anmeldelink konnte nicht gesendet werden: " + error.message);
-  else note($("loginMsg"), "Link gesendet. Öffne die E-Mail auf diesem Gerät und tipp auf den Link.", true);
+  const { error } = await sb.auth.signInWithPassword({ email: e.target.email.value.trim().toLowerCase(), password: e.target.pw.value });
+  if (error) note($("loginMsg"), "E-Mail oder Passwort falsch.");
 });
+$("pwBtn").onclick = async () => {
+  const pw = prompt("Neues Passwort (mindestens 8 Zeichen):");
+  if (pw === null) return;
+  if (pw.length < 8) return alert("Mindestens 8 Zeichen.");
+  const { error } = await sb.auth.updateUser({ password: pw });
+  alert(error ? "Konnte nicht geändert werden: " + error.message : "Passwort geändert.");
+};
 $("logout").onclick = async () => { await sb.auth.signOut(); show("loginView"); };
 
 let started = false;
