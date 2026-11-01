@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-01-annehmen";
+const APP_VERSION = "2026-11-01-gratis";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -458,7 +458,7 @@ function orderDetail(o){
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
     <ul class="lines">${o.posten.map(p => `<li><span>${p.menge}× ${esc(p.name)}</span><span>${eur(p.menge*p.preis)}</span></li>`).join("")}
-      <li><span>Lieferung</span><span>${eur(o.liefergebuehr)}</span></li>
+      ${Number(o.liefergebuehr) ? `<li><span>Lieferung</span><span>${eur(o.liefergebuehr)}</span></li>` : ""}
       ${o.pfand>0?`<li><span>Pfand (${pfStk}×)</span><span>${eur(o.pfand)}</span></li>`:""}
       ${o.pfand_retour>0?`<li><span>Leergut retour (${o.leergut_stk}×)</span><span>− ${eur(o.pfand_retour)}</span></li>`:""}
       <li class="tot"><span>Gesamt${o.zahlart && o.status==="geliefert"?` · ${o.zahlart==="bar"?"bar":"Karte"}`:""}</span><span>${eur(o.gesamt)}</span></li></ul>

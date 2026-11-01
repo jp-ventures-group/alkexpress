@@ -52,7 +52,7 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
       <div class="small">${new Date(b.beleg_am).toLocaleString("de-AT")} · ${esc(b.event||"")}</div>
       <table>
         ${b.posten.map(p => `<tr><td>${p.menge} × ${esc(p.name)}<div class="small">à ${eur(p.preis)}</div></td><td class="n">${eur(p.menge*p.preis)}</td></tr>`).join("")}
-        <tr><td>Liefergebühr</td><td class="n">${eur(b.liefergebuehr)}</td></tr>
+        ${Number(b.liefergebuehr) ? `<tr><td>Liefergebühr</td><td class="n">${eur(b.liefergebuehr)}</td></tr>` : ""}
         ${Number(b.pfand) ? `<tr><td>Pfand (${pfStk} × Einweg)</td><td class="n">${eur(b.pfand)}</td></tr>` : ""}
         ${Number(b.pfand_retour) ? `<tr><td>Pfandrückgabe (${b.leergut_stk} Stück)</td><td class="n">− ${eur(b.pfand_retour)}</td></tr>` : ""}
         <tr class="tot"><td>Gesamt</td><td class="n">${eur(b.gesamt)}</td></tr>
