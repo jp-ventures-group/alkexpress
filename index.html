@@ -100,6 +100,12 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .status.live .dot{background:var(--go);box-shadow:0 0 0 6px rgba(79,214,168,.2)}
 .status b{display:block;font-size:18px}
 .status span{color:var(--muted);font-size:15px}
+.minibar{display:none;border-top:1px solid var(--line);background:var(--ink-2);font-size:14px;text-decoration:none;color:inherit}
+.minibar.on{display:block}
+.minibar .wrap{display:flex;gap:10px;align-items:center;padding-top:9px;padding-bottom:9px}
+.minibar .dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.minibar b{white-space:nowrap}
+.minibar span{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .events{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
 .events li{display:grid;grid-template-columns:86px 1fr;gap:4px 16px;padding:16px 0;border-bottom:1px solid var(--line)}
 .events .d{font-family:var(--display);font-weight:800;font-stretch:85%;font-size:20px;line-height:1.1;grid-row:span 2}
@@ -176,6 +182,7 @@ dialog p{margin:0 0 18px}
     <a href="#" class="logo">Alk<b>Express</b></a>
     <button class="cart-btn" id="openCart" aria-label="Warenkorb öffnen">Warenkorb <span class="n" id="count">0</span></button>
   </div>
+  <a class="minibar" id="minibar" href="#events"><div class="wrap"><span class="dot"></span><b>Keine Lieferung</b><span id="miniSub"></span></div></a>
 </header>
 
 <main>
@@ -411,6 +418,13 @@ async function loadEvents(){
   }catch(e){ EVENTS = []; }
   renderEvents();
 }
+/* Mini-Banner im Header, sobald der große Status weggescrollt ist und nicht geliefert wird */
+let STATUS_VISIBLE = true;
+function updMini(){
+  const isLive = document.getElementById("status").classList.contains("live");
+  document.getElementById("minibar").classList.toggle("on", !isLive && !STATUS_VISIBLE);
+}
+new IntersectionObserver(([en]) => { STATUS_VISIBLE = en.isIntersecting; updMini(); }, { rootMargin: "-64px 0px 0px 0px" }).observe(document.getElementById("status"));
 const EV_MAX = 4; let EV_ALL = false;
 document.getElementById("evMore").addEventListener("click", () => {
   EV_ALL = !EV_ALL; renderEvents();
@@ -432,6 +446,8 @@ function renderEvents(){
     document.getElementById("statusTitle").textContent = "Gerade keine Lieferung";
     document.getElementById("statusSub").textContent = "Neue Events kündigen wir auf Instagram an.";
   }
+  document.getElementById("miniSub").textContent = upcoming.length ? `ab ${fmtDay(new Date(upcoming[0].liefer_von))} ${fmtTime(new Date(upcoming[0].liefer_von))}` : "";
+  updMini();
   const list = document.getElementById("eventList"), more = document.getElementById("evMore");
   const shown = EV_ALL ? EVENTS : EVENTS.slice(0, EV_MAX);
   more.hidden = EVENTS.length <= EV_MAX;
