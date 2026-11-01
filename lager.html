@@ -135,6 +135,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
       <button class="chip" data-f="heute">Heute erledigt</button>
       <button class="chip" data-f="alle">Alle</button>
     </div>
+    <div id="fahrerCard"></div>
     <div id="legacyCard"></div>
     <div id="bestList"></div>
   </section>
@@ -256,6 +257,22 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
       </form>
     </div>
   </section>
+  <section id="tab-team" class="tab hidden">
+    <h1>Team</h1>
+    <p class="muted" style="font-size:15px">Admins sehen und dürfen alles. Fahrer sehen nur bestätigte Bestellungen ihres Events, liefern und kassieren.</p>
+    <div id="teamList"></div>
+    <div class="card">
+      <h2>Person anlegen oder ändern</h2>
+      <form id="teamForm" style="display:grid;gap:10px">
+        <label>Name <input name="name" required placeholder="z. B. Max"></label>
+        <label>E-Mail <input type="email" name="email" required autocomplete="off"></label>
+        <label>Rolle <select name="rolle"><option value="fahrer">Fahrer</option><option value="admin">Admin</option></select></label>
+        <label>Passwort <input name="pw" autocomplete="new-password" placeholder="mind. 8 Zeichen, leer = unverändert"></label>
+        <button class="btn" type="submit">Speichern</button>
+        <div class="note hidden" id="teamMsg" role="status"></div>
+      </form>
+    </div>
+  </section>
 </main>
 
 <div class="save hidden" id="saveBar"><button class="btn y" id="saveBtn">Änderungen speichern</button></div>
@@ -265,6 +282,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
   <button data-tab="lager">Lager</button>
   <button data-tab="events">Events</button>
   <button data-tab="kassa">Kassa</button>
+  <button data-tab="team">Team</button>
 </div></nav>
 
 <script>
@@ -287,6 +305,8 @@ function waPhone(p){
 }
 const wa = (tel, text) => `https://wa.me/${waPhone(tel)}?text=${encodeURIComponent(text)}`;
 
+let ROLE = "admin", MY_EVENT = null, TEAM = [];
+const isChef = () => ROLE === "admin";
 let ME = "", rows = [], edits = {}, events = [], orders = [], SET = null, openId = null, seenIds = new Set();
 const GROUPS = [["p","Pakete"],["b","Bier & Cider"],["w","Wein & Sekt"],["s","Spirituosen & Mischgetränke"],["n","Ohne Alkohol & Zubehör"]];
 const STATUS = { eingegangen:"Neu", bestaetigt:"Bestätigt", unterwegs:"Unterwegs", geliefert:"Geliefert", abgelehnt:"Abgelehnt", storniert:"Storniert" };
@@ -327,15 +347,20 @@ async function start(){
   if (!session) return show("loginView");
   const { data: admin } = await sb.rpc("is_admin");
   if (!admin) return show("denyView");
-  ME = (await sb.rpc("team_name")).data || ""; $("who").textContent = ME;
-  show("app"); goTab(sessionStorage.getItem("ae_tab") || "best");
-  await Promise.all([loadLager(), loadEvents(), loadOrders(), loadSettings()]);
+  ME = (await sb.rpc("team_name")).data || "";
+  ROLE = (await sb.rpc("meine_rolle")).data || "fahrer";
+  MY_EVENT = (await sb.rpc("mein_event")).data || null;
+  $("who").textContent = ME + (isChef() ? "" : " · Fahrer");
+  document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
+  $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
+  show("app"); goTab(isChef() ? (sessionStorage.getItem("ae_tab") || "best") : "best");
+  await Promise.all([loadLager(), loadEvents(), loadOrders(), loadSettings(), isChef() ? loadTeam() : null]);
   const op = sessionStorage.getItem("ae_open"); if (op){ sessionStorage.removeItem("ae_open"); openId = op; goTab("best"); renderOrders(); updSum(); }
   renderLegacy();
   if (!started){ started = true;
     sb.channel("best").on("postgres_changes", { event:"*", schema:"public", table:"bestellungen" }, () => loadOrders()).subscribe();
     sb.channel("lager").on("postgres_changes", { event:"UPDATE", schema:"public", table:"lager" }, () => { if (!Object.keys(edits).length) loadLager(); }).subscribe();
-    setInterval(loadOrders, 60000);
+    setInterval(loadOrders, isChef() ? 60000 : 20000);
   }
 }
 if (!location.hash.includes("access_token")) history.replaceState(null, "", location.pathname);
@@ -347,6 +372,7 @@ function goTab(t){
   try{ sessionStorage.setItem("ae_tab", t); }catch(e){}
   $("saveBar").classList.toggle("hidden", t !== "lager" || !Object.keys(edits).length);
   if (t === "kassa") renderKassa();
+  if (t === "team") loadTeam();
   window.scrollTo(0,0);
 }
 document.querySelectorAll("nav.tabs button").forEach(b => b.onclick = () => goTab(b.dataset.tab));
@@ -357,10 +383,10 @@ async function loadOrders(){
   const since = new Date(Date.now() - 45*864e5).toISOString();
   const { data, error } = await sb.from("bestellungen").select("*").gt("created_at", since).order("created_at", { ascending:false }).limit(500);
   if (error) return;
-  const fresh = data.filter(o => o.status === "eingegangen" && !seenIds.has(o.id));
+  const fresh = data.filter(o => o.status === (isChef() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id));
   if (seenIds.size && fresh.length) alertNew(fresh[0]);
   data.forEach(o => seenIds.add(o.id)); if (!data.length) seenIds.add("-");
-  orders = data; renderOrders(); updSum();
+  orders = data; renderOrders(); updSum(); renderFahrer();
 }
 function alertNew(o){
   toast(`Neue Bestellung #${o.nr}: ${o.kunde_name}, ${eur(o.gesamt)}`);
@@ -384,9 +410,14 @@ function renderOrders(){
     : `<p class="muted">${bestFilter === "offen" ? "Keine offenen Bestellungen. Neue erscheinen hier automatisch, mit Ton und Vibration." : "Nichts in diesem Zeitraum."}</p>`;
 }
 function ageBadge(o){ return o.max_alter >= 18 ? '<span class="badge age">18+</span>' : o.max_alter >= 16 ? '<span class="badge" style="background:var(--y);color:var(--ink)">16+</span>' : ""; }
+function packBadge(o){
+  if (!["bestaetigt","unterwegs"].includes(o.status)) return "";
+  return (isChef() && !o.gepackt ? '<span class="badge" style="background:var(--y);color:var(--ink)">packen</span>' : "")
+    + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isChef() ? "" : '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>'));
+}
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${o.nr} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}</div>
+    <div class="t">#${o.nr} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -410,7 +441,23 @@ function orderDetail(o){
       ${o.pfand>0?`<li><span>Pfand (${pfStk}×)</span><span>${eur(o.pfand)}</span></li>`:""}
       ${o.pfand_retour>0?`<li><span>Leergut retour (${o.leergut_stk}×)</span><span>− ${eur(o.pfand_retour)}</span></li>`:""}
       <li class="tot"><span>Gesamt${o.zahlart && o.status==="geliefert"?` · ${o.zahlart==="bar"?"bar":"Karte"}`:""}</span><span>${eur(o.gesamt)}</span></li></ul>
-    ${!done ? `
+    ${!done && isChef() && o.status !== "eingegangen" ? `
+    <div class="sec">
+      <strong style="font-size:15px">Auto &amp; Fahrer</strong>
+      <div class="btns">
+        <button class="btn ${o.gepackt ? "o" : "y"} sm" data-pack="${o.id}">${o.gepackt ? "✓ Gepackt" : "Als gepackt markieren"}</button>
+        <span style="align-self:center">${o.fahrer ? `Liefert: <strong>${esc(o.fahrer)}</strong>` : "Noch kein Fahrer"}</span>
+      </div>
+    </div>` : ""}
+    ${!done && !isChef() ? `
+    <div class="sec">
+      <strong style="font-size:15px">1 · Liefern</strong>
+      <div class="btns">
+        ${o.fahrer ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da (WhatsApp)</a>`
+          : `<button class="btn y" data-claim="${o.id}">Ich liefere diese Bestellung</button>`}
+      </div>
+    </div>` : ""}
+    ${!done && (isChef() || o.fahrer) ? `${isChef() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
       <div class="btns">
@@ -419,7 +466,7 @@ function orderDetail(o){
         <a class="btn wa" target="_blank" rel="noopener" data-act="unterwegs" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da</a>
         <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, bei deiner Bestellung #${o.nr} (${items}) ist leider etwas ausverkauft. Wir melden uns gleich mit einer Alternative, okay?`)}">Etwas ausverkauft</a>
       </div>
-    </div>
+    </div>` : ""}
     <div class="sec">
       <strong style="font-size:15px">2 · Übergabe</strong>
       ${o.max_alter ? `<label class="check"><input type="checkbox" id="xAusweis"> Amtlichen Lichtbildausweis geprüft: mindestens ${o.max_alter} Jahre, Name passt zur Bestellung, nicht erkennbar betrunken</label>` : `<input type="checkbox" id="xAusweis" class="hidden" checked>`}
@@ -430,7 +477,7 @@ function orderDetail(o){
       <button class="btn y" data-finish="${o.id}">Übergabe abschließen und Beleg erstellen</button>
       <div class="note hidden" id="xMsg" role="alert"></div>
     </div>
-    <div class="sec">
+    ${isChef() ? `<div class="sec">
       <strong style="font-size:15px">Nicht geliefert?</strong>
       <div class="btns">
         <select id="xGrund" aria-label="Grund" style="flex:1;min-width:180px">
@@ -438,7 +485,7 @@ function orderDetail(o){
         </select>
         <button class="btn o sm" data-reject="${o.id}">Ablehnen</button>
       </div>
-    </div>` : ""}
+    </div>` : `<p class="muted" style="font-size:14px;margin:10px 0 0">Kein Ausweis, zu jung oder nicht auffindbar? Nicht übergeben und dem Admin Bescheid geben.</p>`}` : ""}
     ${o.status==="geliefert" ? `<div class="sec">
       <p style="margin:0"><strong>Beleg Nr. ${o.beleg_nr}</strong> · ${fmtDT(o.beleg_am)}</p>
       <div class="btns">
@@ -465,6 +512,15 @@ $("bestList").addEventListener("click", async e => {
   if (act){ const o = orders.find(x => x.id === act.dataset.id), seq = ["eingegangen","bestaetigt","unterwegs"];
     if (seq.indexOf(act.dataset.act) > seq.indexOf(o.status)) sb.rpc("bestellung_status", { b_id:o.id, neu:act.dataset.act }).then(loadOrders);
     return; }
+  const claim = e.target.closest("[data-claim]");
+  if (claim){ claim.disabled = true;
+    const { error } = await sb.rpc("bestellung_status", { b_id: claim.dataset.claim, neu: "unterwegs" });
+    if (error){ toast(error.message); claim.disabled = false; } else toast("Übernommen. Die Bestellung gehört jetzt dir.");
+    loadOrders(); return; }
+  const pack = e.target.closest("[data-pack]");
+  if (pack){ const o = orders.find(x => x.id === pack.dataset.pack);
+    const { error } = await sb.from("bestellungen").update({ gepackt: !o.gepackt }).eq("id", o.id);
+    if (error) toast(error.message); loadOrders(); return; }
   const fin = e.target.closest("[data-finish]");
   if (fin){
     const zahl = document.querySelector("#xZahl button.on");
@@ -489,6 +545,94 @@ $("bestList").addEventListener("click", async e => {
 });
 $("bestList").addEventListener("input", e => { if (e.target.id === "xLeer") updSum(); });
 $("bestList").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-open]")) e.target.click(); });
+
+/* ================= Fahrer: Check-in & meine Kasse ================= */
+function renderFahrer(){
+  const box = $("fahrerCard"); if (!box) return;
+  if (isChef()){ box.innerHTML = ""; return; }
+  const now = Date.now();
+  const relevant = events.filter(e => e.aktiv !== false && new Date(e.liefer_bis) > now && new Date(e.liefer_von) - now < 18*36e5);
+  const mine = events.find(e => e.id === MY_EVENT);
+  const meine = orders.filter(o => o.status === "geliefert" && o.fahrer === ME);
+  const bar = meine.filter(o => o.zahlart === "bar").reduce((s,o)=>s+Number(o.gesamt),0);
+  const karte = meine.filter(o => o.zahlart === "karte").reduce((s,o)=>s+Number(o.gesamt),0);
+  box.innerHTML = `<div class="card">
+    ${MY_EVENT ? `<p style="margin:0"><strong>Du bist dabei:</strong> ${esc(mine ? mine.name : "Event")}</p>
+      <p class="muted" style="margin:4px 0 10px;font-size:14px">Bestätigte Bestellungen kommen automatisch mit Ton. Wer zuerst „Ich liefere“ tippt, übernimmt.</p>
+      <button class="btn o sm" data-checkin="">Fertig für heute</button>`
+    : relevant.length ? `<p style="margin:0 0 8px"><strong>Bei welchem Event bist du dabei?</strong></p>
+      <div class="btns">${relevant.map(e => `<button class="btn y" data-checkin="${e.id}">${esc(e.name)}</button>`).join("")}</div>`
+    : `<p style="margin:0" class="muted">Heute ist kein Event geplant.</p>`}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid #DDD9F5">
+      <strong>Meine Kasse (letzte 18 h)</strong>
+      <p style="margin:4px 0 0">${meine.length} Lieferungen · <strong>Bar abzugeben: ${eur(bar)}</strong> · Karte: ${eur(karte)}</p>
+    </div></div>`;
+}
+$("fahrerCard").addEventListener("click", async e => {
+  const b = e.target.closest("[data-checkin]"); if (!b) return;
+  const ev = b.dataset.checkin || null;
+  const { error } = await sb.rpc("fahrer_checkin", { p_event: ev });
+  if (error) return toast(error.message);
+  MY_EVENT = ev; toast(ev ? "Eingecheckt. Los geht's!" : "Ausgecheckt. Gib dein Bargeld beim Admin ab.");
+  seenIds = new Set(); await loadOrders();
+});
+
+/* ================= Team (nur Admin) ================= */
+async function loadTeam(){
+  if (!isChef()) return;
+  const { data } = await sb.from("admins").select("*").order("rolle").order("name");
+  TEAM = data || []; renderTeam();
+}
+function renderTeam(){
+  const since = new Date(Date.now() - 18*36e5);
+  $("teamList").innerHTML = TEAM.map(t => {
+    const name = t.name || t.email, ev = events.find(e => e.id === t.aktiv_event);
+    const mine = orders.filter(o => o.status === "geliefert" && o.fahrer === name && new Date(o.beleg_am) > since);
+    const bar = mine.filter(o => o.zahlart === "bar").reduce((s,o)=>s+Number(o.gesamt),0);
+    return `<div class="card" style="padding:14px 16px">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
+        <div><strong>${esc(name)}</strong> <span class="badge" style="background:${t.rolle==="admin"?"var(--ink)":"var(--y)"};color:${t.rolle==="admin"?"#fff":"var(--ink)"}">${t.rolle==="admin"?"Admin":"Fahrer"}</span>
+          <div class="muted" style="font-size:14px">${esc(t.email)}</div>
+          <div style="font-size:14px;margin-top:4px">${ev ? `🟢 dabei: ${esc(ev.name)}` : "nicht eingecheckt"} · ${mine.length} Lieferungen, bar ${eur(bar)}</div></div>
+        <div class="btns" style="flex-direction:column">
+          <button class="btn o sm" data-tedit="${esc(t.email)}">Ändern</button>
+          ${t.email.toLowerCase() !== (SESSION_EMAIL||"").toLowerCase() ? `<button class="btn o sm" data-tdel="${esc(t.email)}">Entfernen</button>` : ""}
+        </div></div></div>`;
+  }).join("") || `<p class="muted">Noch niemand angelegt.</p>`;
+}
+let SESSION_EMAIL = "";
+sb.auth.getSession().then(({data}) => { SESSION_EMAIL = data.session?.user?.email || ""; });
+$("teamList").addEventListener("click", async e => {
+  const ed = e.target.closest("[data-tedit]");
+  if (ed){ const t = TEAM.find(x => x.email === ed.dataset.tedit), f = $("teamForm");
+    f.name.value = t.name || ""; f.email.value = t.email; f.rolle.value = t.rolle; f.pw.value = "";
+    f.scrollIntoView({ behavior:"smooth" }); return; }
+  const del = e.target.closest("[data-tdel]");
+  if (del){
+    if (del.dataset.confirm !== "1"){ del.dataset.confirm = "1"; del.textContent = "Wirklich?"; return; }
+    const { error } = await sb.rpc("team_entfernen", { p_email: del.dataset.tdel });
+    if (error) return toast(error.message); toast("Entfernt. Kein Zugriff mehr."); loadTeam();
+  }
+});
+$("teamForm").addEventListener("submit", async e => {
+  e.preventDefault();
+  const f = e.target, email = f.email.value.trim().toLowerCase(), pw = f.pw.value, msg = $("teamMsg");
+  const exists = TEAM.some(t => t.email.toLowerCase() === email);
+  if (!exists && pw.length < 8) return note(msg, "Neue Person braucht ein Passwort mit mindestens 8 Zeichen.");
+  if (pw && pw.length < 8) return note(msg, "Passwort: mindestens 8 Zeichen.");
+  f.querySelector("button").disabled = true;
+  if (!exists){
+    // Konto anlegen, ohne die eigene Anmeldung zu verlieren
+    const tmp = supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:false, autoRefreshToken:false, storageKey:"ae_tmp" } });
+    const { error } = await tmp.auth.signUp({ email, password: pw });
+    if (error && !/registered|exists/i.test(error.message)){ f.querySelector("button").disabled = false; return note(msg, "Konto konnte nicht angelegt werden: " + error.message); }
+  }
+  const { error } = await sb.rpc("team_speichern", { p_email: email, p_name: f.name.value, p_rolle: f.rolle.value, p_pw: pw || null });
+  f.querySelector("button").disabled = false;
+  if (error) return note(msg, error.message);
+  note(msg, `Gespeichert. ${f.name.value} meldet sich mit ${email}${pw ? " und dem neuen Passwort" : ""} an.`, true);
+  f.reset(); loadTeam();
+});
 
 /* Bestellungen, die ohne Datenbank kamen (Shop offline) */
 function renderLegacy(){
@@ -565,7 +709,7 @@ async function loadEvents(){
   const since = new Date(Date.now() - 60*864e5).toISOString();
   const { data, error } = await sb.from("events").select("*").gt("liefer_bis", since).order("liefer_von");
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
-  events = data; renderEvents();
+  events = data; renderEvents(); renderFahrer(); if (isChef() && TEAM.length) renderTeam();
 }
 function renderEvents(){
   const now = new Date();
