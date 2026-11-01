@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-01-gratis";
+const APP_VERSION = "2026-11-01-ranking";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -832,8 +832,14 @@ async function renderKassa(){
     <div class="kpi"><b>${eur(karte)}</b><span>per Karte</span></div>`;
   const split = ustSplit(ok);
   const grund = {}; rej.forEach(o => grund[o.grund||o.status] = (grund[o.grund||o.status]||0)+1);
-  const prod = {}; ok.forEach(o => o.posten.forEach(p => prod[p.name] = (prod[p.name]||0) + p.menge));
-  const top = Object.entries(prod).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  /* Verkaufsranking: Stück und Umsatz je Produkt (Rabatt-Zusatz im Namen zusammengefasst) */
+  const prod = {};
+  ok.forEach(o => o.posten.forEach(p => { const k = p.id || p.name; const e = prod[k] ||= { name: p.name.replace(/\s*\(−10 %.*\)$/, ""), stk: 0, eur: 0 };
+    e.stk += p.menge; e.eur += p.menge * Number(p.preis); }));
+  const rank = Object.values(prod).sort((a,b) => b.eur - a.eur);
+  const totEur = rank.reduce((s,x)=>s+x.eur,0) || 1, maxEur = rank.length ? rank[0].eur : 1;
+  const sold = new Set(Object.keys(prod));
+  const lahm = rows.filter(x => x.aktiv && !sold.has(x.id)).map(x => x.name);
   const ku = SET && SET.kleinunternehmer;
   $("kDetail").innerHTML = `<h2>${esc(r.label)}</h2>
     <table class="t"><tr><th>USt-Satz</th><th class="n">Brutto</th><th class="n">Netto</th><th class="n">${ku ? "USt (Info)" : "USt"}</th></tr>
@@ -841,7 +847,13 @@ async function renderKassa(){
     </table>
     ${ku ? `<p class="q" style="font-size:14px;margin:6px 0 0">Kleinunternehmer: keine USt abzuführen. Die Spalte zeigt nur, was es ohne Befreiung wäre.</p>` : ""}
     <p style="margin:12px 0 0">Pfand netto (durchlaufender Posten, kein Umsatz): <strong>${eur(pfand)}</strong></p>
-    ${top.length ? `<p style="margin:12px 0 4px;font-weight:700">Meistverkauft</p><p style="margin:0">${top.map(([n,q]) => `${q}× ${esc(n)}`).join(" · ")}</p>` : ""}
+    <p style="margin:16px 0 6px;font-weight:700">Was läuft am besten</p>
+    ${rank.length ? `<table class="t"><tr><th>Produkt</th><th class="n">Stk.</th><th class="n">Umsatz</th><th class="n">Anteil</th></tr>
+      ${rank.map(x => `<tr><td>${esc(x.name)}<div style="height:5px;border-radius:3px;background:var(--y);margin-top:4px;width:${Math.max(4, Math.round(x.eur/maxEur*100))}%"></div></td>
+        <td class="n">${x.stk}</td><td class="n">${eur(r2(x.eur))}</td><td class="n">${Math.round(x.eur/totEur*100)} %</td></tr>`).join("")}</table>`
+      : `<p class="q" style="margin:0">Noch keine Verkäufe in diesem Zeitraum.</p>`}
+    ${rank.length && lahm.length ? `<p style="margin:12px 0 4px;font-weight:700">Nicht verkauft</p><p class="q" style="margin:0">${lahm.map(esc).join(" · ")}</p>` : ""}
+    <p class="q" style="margin:10px 0 0;font-size:14px">Kundenwünsche findest du unter Team → Kunden-Feedback.</p>
     ${rej.length ? `<p style="margin:12px 0 4px;font-weight:700">Abgelehnt</p><p style="margin:0">${Object.entries(grund).map(([g,n]) => `${n}× ${esc(g)}`).join(" · ")}</p>` : ""}`;
   KASSA = { r, ok, bar, karte }; updTa();
 }
