@@ -106,7 +106,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 </style>
 </head>
 <body>
-<header><div class="bar"><div class="logo">Alk<b>Express</b> Team</div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn">Passwort</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
+<header><div class="bar"><div class="logo">Alk<b>Express</b> Team</div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
 <div class="toast hidden" id="toast" role="status"></div>
 
 <main class="wrap">
@@ -262,15 +262,8 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
     <p class="muted" style="font-size:15px">Admins sehen und dürfen alles. Fahrer sehen nur bestätigte Bestellungen ihres Events, liefern und kassieren.</p>
     <div id="teamList"></div>
     <div class="card">
-      <h2>Person anlegen oder ändern</h2>
-      <form id="teamForm" style="display:grid;gap:10px">
-        <label>Name <input name="name" required placeholder="z. B. Max"></label>
-        <label>E-Mail <input type="email" name="email" required autocomplete="off"></label>
-        <label>Rolle <select name="rolle"><option value="fahrer">Fahrer</option><option value="admin">Admin</option></select></label>
-        <label>Passwort <input name="pw" autocomplete="new-password" placeholder="mind. 8 Zeichen, leer = unverändert"></label>
-        <button class="btn" type="submit">Speichern</button>
-        <div class="note hidden" id="teamMsg" role="status"></div>
-      </form>
+      <h2>Person hinzufügen</h2>
+      <p style="margin:0;font-size:15px">Schick Claude Name, E-Mail, Rolle (Admin oder Fahrer) und ein Startpasswort. Die Person kann ihr Passwort danach oben unter „Passwort“ selbst ändern.</p>
     </div>
   </section>
 </main>
@@ -594,46 +587,9 @@ function renderTeam(){
         <div><strong>${esc(name)}</strong> <span class="badge" style="background:${t.rolle==="admin"?"var(--ink)":"var(--y)"};color:${t.rolle==="admin"?"#fff":"var(--ink)"}">${t.rolle==="admin"?"Admin":"Fahrer"}</span>
           <div class="muted" style="font-size:14px">${esc(t.email)}</div>
           <div style="font-size:14px;margin-top:4px">${ev ? `🟢 dabei: ${esc(ev.name)}` : "nicht eingecheckt"} · ${mine.length} Lieferungen, bar ${eur(bar)}</div></div>
-        <div class="btns" style="flex-direction:column">
-          <button class="btn o sm" data-tedit="${esc(t.email)}">Ändern</button>
-          ${t.email.toLowerCase() !== (SESSION_EMAIL||"").toLowerCase() ? `<button class="btn o sm" data-tdel="${esc(t.email)}">Entfernen</button>` : ""}
-        </div></div></div>`;
+        </div></div>`;
   }).join("") || `<p class="muted">Noch niemand angelegt.</p>`;
 }
-let SESSION_EMAIL = "";
-sb.auth.getSession().then(({data}) => { SESSION_EMAIL = data.session?.user?.email || ""; });
-$("teamList").addEventListener("click", async e => {
-  const ed = e.target.closest("[data-tedit]");
-  if (ed){ const t = TEAM.find(x => x.email === ed.dataset.tedit), f = $("teamForm");
-    f.name.value = t.name || ""; f.email.value = t.email; f.rolle.value = t.rolle; f.pw.value = "";
-    f.scrollIntoView({ behavior:"smooth" }); return; }
-  const del = e.target.closest("[data-tdel]");
-  if (del){
-    if (del.dataset.confirm !== "1"){ del.dataset.confirm = "1"; del.textContent = "Wirklich?"; return; }
-    const { error } = await sb.rpc("team_entfernen", { p_email: del.dataset.tdel });
-    if (error) return toast(error.message); toast("Entfernt. Kein Zugriff mehr."); loadTeam();
-  }
-});
-$("teamForm").addEventListener("submit", async e => {
-  e.preventDefault();
-  const f = e.target, email = f.email.value.trim().toLowerCase(), pw = f.pw.value, msg = $("teamMsg");
-  const exists = TEAM.some(t => t.email.toLowerCase() === email);
-  if (!exists && pw.length < 8) return note(msg, "Neue Person braucht ein Passwort mit mindestens 8 Zeichen.");
-  if (pw && pw.length < 8) return note(msg, "Passwort: mindestens 8 Zeichen.");
-  f.querySelector("button").disabled = true;
-  if (!exists){
-    // Konto anlegen, ohne die eigene Anmeldung zu verlieren
-    const tmp = supabase.createClient(SUPA_URL, SUPA_KEY, { auth:{ persistSession:false, autoRefreshToken:false, storageKey:"ae_tmp" } });
-    const { error } = await tmp.auth.signUp({ email, password: pw });
-    if (error && !/registered|exists/i.test(error.message)){ f.querySelector("button").disabled = false; return note(msg, "Konto konnte nicht angelegt werden: " + error.message); }
-  }
-  const { error } = await sb.rpc("team_speichern", { p_email: email, p_name: f.name.value, p_rolle: f.rolle.value, p_pw: pw || null });
-  f.querySelector("button").disabled = false;
-  if (error) return note(msg, error.message);
-  note(msg, `Gespeichert. ${f.name.value} meldet sich mit ${email}${pw ? " und dem neuen Passwort" : ""} an.`, true);
-  f.reset(); loadTeam();
-});
-
 /* Bestellungen, die ohne Datenbank kamen (Shop offline) */
 function renderLegacy(){
   let o = null; try{ o = JSON.parse(sessionStorage.getItem("ae_legacy")||"null"); }catch(e){}
