@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-codes";
+const APP_VERSION = "2026-11-02-fahrertexte";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -440,8 +440,13 @@ const MSG = {
   best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
   da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
   weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
+  gleich: (o, first) => `Hi ${first} 👋\n\n🚶 *Bin in ca. 2 Minuten bei dir!* (Bestellung #${oc(o)})\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n\n_AlkExpress_`,
+  suche: (o, first) => `Hi ${first},\n\n📍 *Ich bin beim Treffpunkt, finde dich aber nicht.* (Bestellung #${oc(o)})\nWo genau bist du? Ich rufe dich gleich an.\n\n_AlkExpress_`,
   beleg: (o, url) => `🧾 *Dein Beleg zu Bestellung #${oc(o)}*\n\n${url}\n\nDanke und viel Spaß! 🎉\n_AlkExpress_`,
 };
+function waBtn(o, label, text){
+  return `<span style="display:inline-flex;gap:4px"><a class="btn wa sm" target="_blank" rel="noopener" href="${wa(o.kunde_tel, text)}">${label}</a><button type="button" class="btn o sm" data-copy="${encodeURIComponent(text)}" aria-label="${label} kopieren">Kopieren</button></span>`;
+}
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
     <div class="t">#${oc(o)} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
@@ -481,10 +486,16 @@ function orderDetail(o){
     <div class="sec">
       <strong style="font-size:15px">1 · Liefern</strong>
       <div class="btns">
-        ${o.fahrer ? `<a class="btn y" href="tel:${esc(o.kunde_tel)}">📞 ${esc(first)} anrufen</a>
-`
+        ${o.fahrer ? `<a class="btn y" href="tel:${esc(o.kunde_tel)}">📞 ${esc(first)} anrufen</a>`
           : `<button class="btn y" data-claim="${o.id}">Ich liefere diese Bestellung</button>`}
       </div>
+      ${o.fahrer ? `<div style="font-weight:700;font-size:14px;margin-top:4px">Nachricht über WhatsApp Business</div>
+      <div class="btns">
+        ${waBtn(o, "Bin da", MSG.da(o, first))}
+        ${waBtn(o, "2 Minuten", MSG.gleich(o, first))}
+        ${waBtn(o, "Finde dich nicht", MSG.suche(o, first))}
+      </div>
+      <p class="muted" style="font-size:13px;margin:2px 0 0">Öffnet sich dein privates WhatsApp? Dann „Kopieren“ tippen und den Text in WhatsApp Business einfügen.</p>` : ""}
     </div>` : ""}
     ${!done && (isChef() || o.fahrer) ? `${isChef() ? `
     <div class="sec">
@@ -542,6 +553,11 @@ $("bestList").addEventListener("click", async e => {
   const act = e.target.closest("[data-act]");
   if (act){ const o = orders.find(x => x.id === act.dataset.id), seq = ["eingegangen","bestaetigt","unterwegs"];
     if (seq.indexOf(act.dataset.act) > seq.indexOf(o.status)) sb.rpc("bestellung_status", { b_id:o.id, neu:act.dataset.act }).then(loadOrders);
+    return; }
+  const cp = e.target.closest("[data-copy]");
+  if (cp){ const t = decodeURIComponent(cp.dataset.copy);
+    try{ await navigator.clipboard.writeText(t); toast("Text kopiert – jetzt in WhatsApp Business einfügen."); }
+    catch(x){ prompt("Text kopieren:", t); }
     return; }
   const qr = e.target.closest("[data-qr]");
   if (qr){ showQr(orders.find(x => x.id === qr.dataset.qr)); return; }
