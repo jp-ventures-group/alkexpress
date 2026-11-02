@@ -350,7 +350,7 @@ dialog p{margin:0 0 18px}
         <div class="res" id="locRes" aria-live="polite"></div>
       </div>
       <label>Treffpunkt <small>So finden wir dich schnell</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke" required></textarea></label>
-      <label>Geburtsdatum <input name="dob" type="date" required></label>
+      <label>Geburtsdatum <input name="dob" type="text" inputmode="numeric" autocomplete="bday" placeholder="TT.MM.JJJJ" maxlength="10" required></label>
       <label>Leergut zur Rückgabe <small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
       <label>Zahlung
         <select name="pay"><option>Bar bei Übergabe</option><option>Karte bei Übergabe</option></select>
@@ -380,7 +380,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-02-facts";
+const SITE_VERSION = "2026-11-02-dob";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -656,7 +656,7 @@ function render(){
   const f = document.getElementById("orderForm");
   let k = null; try{ k = JSON.parse(localStorage.getItem("ae_kunde") || "null"); }catch(x){}
   if (!k) return;
-  if (k.name) f.name.value = k.name; if (k.phone) f.phone.value = k.phone; if (k.dob) f.dob.value = k.dob; if (k.pay) f.pay.value = k.pay;
+  if (k.name) f.name.value = k.name; if (k.phone) f.phone.value = k.phone; if (k.dob) f.dob.value = /^\d{4}-\d{2}-\d{2}$/.test(k.dob) ? k.dob.split("-").reverse().join(".") : k.dob; if (k.pay) f.pay.value = k.pay;
   f.id.checked = true; f.agb.checked = true;
   document.getElementById("savedTxt").textContent = `Willkommen zurück, ${k.name.split(" ")[0]}! Deine Daten sind schon eingetragen.`;
   document.getElementById("savedBox").hidden = false;
@@ -666,6 +666,21 @@ function render(){
     document.getElementById("savedBox").hidden = true;
   };
 })();
+
+/* Geburtsdatum: TT.MM.JJJJ tippen, Punkte kommen automatisch */
+function parseDob(v){
+  const m = String(v).trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (!m) return null;
+  const d = +m[1], mo = +m[2], y = +m[3], dt = new Date(y, mo - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== mo - 1 || dt.getDate() !== d || y < 1900 || dt > new Date()) return null;
+  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+document.querySelector("[name=dob]").addEventListener("input", e => {
+  const el = e.target, del = e.inputType && e.inputType.startsWith("delete");
+  let digits = el.value.replace(/\D/g, "").slice(0, 8);
+  let out = digits.slice(0,2); if (digits.length > 2) out += "." + digits.slice(2,4); if (digits.length > 4) out += "." + digits.slice(4);
+  if (!del && (digits.length === 2 || digits.length === 4)) out += ".";
+  el.value = out;
+});
 
 /* Feedback */
 document.getElementById("fbForm").addEventListener("submit", async e => {
@@ -716,7 +731,9 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
   if (t.sub < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.sub)}.`);
   for (const k of ["name","phone","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
-  const age = ageOn(f.dob.value);
+  const dob = parseDob(f.dob.value);
+  if (!dob) return showErr("Bitte gib dein Geburtsdatum als TT.MM.JJJJ ein, z. B. 05.03.2004.");
+  const age = ageOn(dob);
   if (t.maxAge === 18 && age < 18) return showErr("Spirituosen und Mischgetränke mit Spirituosen gibt es erst ab 18. Entferne sie aus dem Warenkorb, um zu bestellen.");
   if (t.maxAge === 16 && age < 16) return showErr("Alkoholische Getränke gibt es erst ab 16.");
   if (!f.id.checked) return showErr("Bestätige, dass du bei der Übergabe deinen Ausweis zeigst.");
