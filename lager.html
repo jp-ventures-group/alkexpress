@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-fahrertexte";
+const APP_VERSION = "2026-11-02-sumup";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -515,6 +515,10 @@ function orderDetail(o){
       <div><div style="font-weight:700;font-size:15px;margin-bottom:6px">Bezahlt mit</div>
         <div class="seg" id="xZahl"><button type="button" data-z="bar">Bar</button><button type="button" data-z="karte">Karte</button></div></div>
       <div id="xSum" style="font-weight:800;font-size:18px"></div>
+      <div id="xSumup" class="hidden" style="background:#EEF3FF;border-radius:14px;padding:12px;display:grid;gap:8px">
+        <button type="button" class="btn" id="xSumupBtn" style="background:#000;color:#fff">💳 In SumUp kassieren</button>
+        <small style="color:#5A5690">Der Betrag wird kopiert und SumUp geöffnet. Dort einfügen, Kunde zahlt per Karte. Danach hierher zurück und abschließen.</small>
+      </div>
       <button class="btn y" data-finish="${o.id}">Übergabe abschließen und Beleg erstellen</button>
       <div class="note hidden" id="xMsg" role="alert"></div>
     </div>
@@ -543,13 +547,22 @@ function updSum(){
   const ret = Math.min(Math.max(parseInt($("xLeer").value)||0,0), pf);
   const tot = r2(Number(o.warenwert) + Number(o.liefergebuehr) + Number(o.pfand) - ret * (SET ? Number(SET.pfand_betrag) : .25));
   $("xSum").textContent = `Zu kassieren: ${eur(tot)}`;
+  $("xSum").dataset.betrag = tot.toFixed(2).replace(".", ",");
 }
 $("bestList").addEventListener("click", async e => {
   const row = e.target.closest("[data-open]");
   if (row){ openId = row.dataset.open; renderOrders(); updSum(); $("det") && $("det").scrollIntoView({ block:"start" }); return; }
   if (e.target.closest("[data-close]")){ openId = null; renderOrders(); return; }
   const z = e.target.closest("#xZahl button");
-  if (z){ document.querySelectorAll("#xZahl button").forEach(b => b.classList.toggle("on", b===z)); return; }
+  if (z){ document.querySelectorAll("#xZahl button").forEach(b => b.classList.toggle("on", b===z));
+    $("xSumup") && $("xSumup").classList.toggle("hidden", z.dataset.z !== "karte"); return; }
+  if (e.target.closest("#xSumupBtn")){
+    updSum(); const betrag = $("xSum").dataset.betrag || "";
+    try{ await navigator.clipboard.writeText(betrag); }catch(x){}
+    toast(`${betrag} € kopiert – in SumUp einfügen.`);
+    const t0 = Date.now(); location.href = "sumupmerchant://";
+    setTimeout(() => { if (document.visibilityState === "visible" && Date.now() - t0 < 2500) toast("SumUp hat sich nicht geöffnet – bitte die SumUp-App selbst öffnen, der Betrag ist kopiert."); }, 1800);
+    return; }
   const act = e.target.closest("[data-act]");
   if (act){ const o = orders.find(x => x.id === act.dataset.id), seq = ["eingegangen","bestaetigt","unterwegs"];
     if (seq.indexOf(act.dataset.act) > seq.indexOf(o.status)) sb.rpc("bestellung_status", { b_id:o.id, neu:act.dataset.act }).then(loadOrders);
