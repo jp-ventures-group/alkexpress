@@ -304,7 +304,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-teamdetail";
+const APP_VERSION = "2026-11-02-belegwa";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -553,7 +553,7 @@ function orderDetail(o){
       <p style="margin:0"><strong>Beleg Nr. ${o.beleg_nr}</strong> · ${fmtDT(o.beleg_am)}</p>
       <div class="btns">
         <button class="btn y" data-qr="${o.id}">Beleg als QR-Code zeigen</button>
-        ${isChef() ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.beleg(o, belegUrl))}">Beleg per WhatsApp senden</a>` : ""}
+        ${isChef() ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.beleg(o, belegUrl))}">Beleg per WhatsApp senden</a>` : waBtn(o, "Beleg per WhatsApp", MSG.beleg(o, belegUrl))}
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
     ${o.grund ? `<p style="margin:12px 0 0" class="q">Grund: ${esc(o.grund)}</p>` : ""}
