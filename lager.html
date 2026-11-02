@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-wa";
+const APP_VERSION = "2026-11-02-codes";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -409,7 +409,7 @@ async function loadOrders(){
   orders = data; renderOrders(); updSum(); renderFahrer();
 }
 function alertNew(o){
-  toast(`Neue Bestellung #${o.nr}: ${o.kunde_name}, ${eur(o.gesamt)}`);
+  toast(`Neue Bestellung #${o.code || o.nr}: ${o.kunde_name}, ${eur(o.gesamt)}`);
   try{ navigator.vibrate && navigator.vibrate([200,100,200]); }catch(e){}
   try{ const c = new (window.AudioContext||window.webkitAudioContext)(), g = c.createGain(), osc = c.createOscillator();
     osc.frequency.value = 880; osc.connect(g); g.connect(c.destination); g.gain.value = .15; osc.start(); osc.stop(c.currentTime + .25); }catch(e){}
@@ -435,9 +435,16 @@ function packBadge(o){
   return (isChef() && !o.gepackt ? '<span class="badge" style="background:var(--y);color:var(--ink)">packen</span>' : "")
     + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isChef() ? "" : '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>'));
 }
+const oc = o => o.code || o.nr;
+const MSG = {
+  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
+  da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
+  weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
+  beleg: (o, url) => `🧾 *Dein Beleg zu Bestellung #${oc(o)}*\n\n${url}\n\nDanke und viel Spaß! 🎉\n_AlkExpress_`,
+};
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${o.nr} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -450,7 +457,7 @@ function orderDetail(o){
   const items = o.posten.map(p => `${p.menge}× ${p.name}`).join(", ");
   return `<div class="card" id="det">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
-      <h2 style="margin:0">#${o.nr} ${esc(o.kunde_name)}</h2>
+      <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
     <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${!isChef() && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
@@ -483,11 +490,11 @@ function orderDetail(o){
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
       <div class="btns">
-        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! Wir sind in ca. 10 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}, bar oder Karte.`)}">Bestätigen · 10 Min</a>
-        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! Gerade ist viel los, wir sind in ca. 20 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}.`)}">Bestätigen · 20 Min</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
         ${o.status === "eingegangen" ? `<button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : ""}
-        <a class="btn wa" target="_blank" rel="noopener" data-act="unterwegs" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da</a>
-        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, bei deiner Bestellung #${o.nr} ist leider etwas nicht mehr verfügbar. Wir rufen dich gleich an, okay?`)}">Etwas ausverkauft</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="unterwegs" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.da(o, first))}">Bin da</a>
+        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>
       </div>
     </div>` : ""}
     <div class="sec">
@@ -513,7 +520,7 @@ function orderDetail(o){
       <p style="margin:0"><strong>Beleg Nr. ${o.beleg_nr}</strong> · ${fmtDT(o.beleg_am)}</p>
       <div class="btns">
         <button class="btn y" data-qr="${o.id}">Beleg als QR-Code zeigen</button>
-        ${isChef() ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Danke für deine Bestellung bei AlkExpress! Hier ist dein Beleg Nr. ${o.beleg_nr}: ${belegUrl}`)}">Beleg per WhatsApp senden</a>` : ""}
+        ${isChef() ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.beleg(o, belegUrl))}">Beleg per WhatsApp senden</a>` : ""}
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
     ${o.grund ? `<p style="margin:12px 0 0" class="q">Grund: ${esc(o.grund)}</p>` : ""}

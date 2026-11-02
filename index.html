@@ -122,6 +122,13 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .fb button{justify-self:start;background:var(--paper);color:var(--ink)}
 .fb-msg{margin:0;font-weight:600;min-height:1.4em}
 .ok-box{background:rgba(79,214,168,.14);border:1px solid rgba(79,214,168,.5);border-radius:16px;padding:16px;line-height:1.45}
+.hero-meta{margin:14px 0 0;font-size:15px;font-weight:600;color:var(--muted)}
+.minbar{margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(255,200,61,.14);border:1px solid rgba(255,200,61,.45);font-size:14px;font-weight:600}
+.minbar .track{height:6px;border-radius:3px;background:rgba(30,27,75,.12);margin-top:7px;overflow:hidden}
+.minbar .fill{height:100%;background:var(--band16)}
+.saved[hidden]{display:none}
+.saved{display:flex;justify-content:space-between;gap:10px;align-items:center;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:rgba(79,214,168,.12);font-size:14px}
+.saved button{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer;font:inherit;padding:0}
 .faqs{border-top:1px solid var(--line)}
 .faq{border-bottom:1px solid var(--line);padding:14px 0}
 .faq summary{font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between;gap:12px}
@@ -229,6 +236,7 @@ dialog p{margin:0 0 18px}
       <h1>Drinks zum Event in Graz. In 15 Minuten.</h1>
       <p>Wir liefern nur bei ausgewählten Events in Graz, direkt vor die Location. Bestell online, wir bringen's dir zu Fuß. Ausweis bereithalten.</p>
       <a class="cta" href="#sortiment">Getränke auswählen</a>
+      <p class="hero-meta">🚚 Lieferung gratis · Mindestbestellwert 15 € · 🪪 nur mit Ausweis</p>
     </div>
     <div class="bands" aria-hidden="true">
       <div class="band b18"><span id="t18"></span></div>
@@ -260,7 +268,7 @@ dialog p{margin:0 0 18px}
   <section id="sortiment">
     <div class="wrap">
       <h2>Sortiment</h2>
-      <p class="lede">Alles gekühlt. Preise inkl. USt., Lieferung gratis. Zzgl. 0,25 € Pfand pro Dose bzw. PET-Flasche.</p>
+      <p class="lede">Alles gekühlt. <b>Mindestbestellwert 15 €</b>, Lieferung gratis. Preise inkl. USt., zzgl. 0,25 € Pfand pro Dose bzw. PET-Flasche.</p>
       <div id="catalog"></div>
       <p class="note">Mindestbestellwert <span id="minVal"></span>. Lieferung gratis.</p>
     </div>
@@ -327,6 +335,7 @@ dialog p{margin:0 0 18px}
   <div class="d-body">
     <div id="cartView"></div>
     <form id="orderForm" novalidate>
+      <div class="saved" id="savedBox" hidden><span id="savedTxt"></span><button type="button" id="forget">Nicht du?</button></div>
       <label>Name <input name="name" autocomplete="name" required></label>
       <label>Handynummer <small>für WhatsApp-Rückmeldung</small><input name="phone" type="tel" autocomplete="tel" required></label>
       <label>Event <select name="event" required></select></label>
@@ -343,9 +352,10 @@ dialog p{margin:0 0 18px}
         <select name="pay"><option>Bar bei Übergabe</option><option>Karte bei Übergabe</option></select>
       </label>
       <label class="check"><input type="checkbox" name="id" required><span>Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
+      <label class="check"><input type="checkbox" name="remember" checked><span>Meine Daten auf diesem Handy merken, damit ich beim nächsten Mal nicht alles neu eintippen muss.</span></label>
       <label class="check"><input type="checkbox" name="agb" required><span>Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
       <div class="err" id="err" role="alert"></div>
-      <button class="send" id="send" type="submit">Bestellung per WhatsApp senden</button>
+      <button class="send" id="send" type="submit">Bestellung abschicken</button>
     </form>
   </div>
 </aside>
@@ -366,7 +376,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-02-wa";
+const SITE_VERSION = "2026-11-02-codes";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -609,21 +619,21 @@ function render(){
   document.getElementById("count").textContent = t.n;
   const dock = document.getElementById("dock");
   dock.classList.toggle("show", t.n > 0 && !document.getElementById("drawer").classList.contains("open"));
-  document.getElementById("dockTxt").textContent = `Warenkorb ansehen (${t.n})`;
+  document.getElementById("dockTxt").textContent = t.sub < CONFIG.minOrder ? `Noch ${eur(CONFIG.minOrder - t.sub)} bis Mindestbestellwert` : `Warenkorb ansehen (${t.n})`;
   document.getElementById("dockSum").textContent = eur(t.total);
 
   const v = document.getElementById("cartView");
   if (!t.n){
     v.innerHTML = LAST_ORDER ? `<div class="ok-box">
         <div style="font-size:34px;line-height:1">✅</div>
-        <h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.nr} ist eingegangen</h3>
+        <h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code} ist eingegangen</h3>
         <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>, bar oder Karte bei der Übergabe.</p>
         <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er bei „${esc(LAST_ORDER.meet)}“ ist.</p>
         ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
       </div>`
       : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
-    v.innerHTML = `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
+    v.innerHTML = (t.sub < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.sub)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.sub/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
@@ -636,6 +646,22 @@ function render(){
   }
   document.getElementById("send").disabled = !t.n || !liveEvents().length;
 }
+
+/* Kundendaten von früheren Bestellungen auf diesem Gerät */
+(function(){
+  const f = document.getElementById("orderForm");
+  let k = null; try{ k = JSON.parse(localStorage.getItem("ae_kunde") || "null"); }catch(x){}
+  if (!k) return;
+  if (k.name) f.name.value = k.name; if (k.phone) f.phone.value = k.phone; if (k.dob) f.dob.value = k.dob; if (k.pay) f.pay.value = k.pay;
+  f.id.checked = true; f.agb.checked = true;
+  document.getElementById("savedTxt").textContent = `Willkommen zurück, ${k.name.split(" ")[0]}! Deine Daten sind schon eingetragen.`;
+  document.getElementById("savedBox").hidden = false;
+  document.getElementById("forget").onclick = () => {
+    try{ localStorage.removeItem("ae_kunde"); }catch(x){}
+    ["name","phone","dob"].forEach(n => f[n].value = ""); f.id.checked = false; f.agb.checked = false;
+    document.getElementById("savedBox").hidden = true;
+  };
+})();
 
 /* Feedback */
 document.getElementById("fbForm").addEventListener("submit", async e => {
@@ -710,7 +736,11 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   send.disabled = false; send.textContent = sendLabel;
   if (offline || !srv) return showErr("Deine Bestellung konnte gerade nicht gesendet werden. Bitte prüf deine Internetverbindung und tipp nochmal auf „Bestellung abschicken“.");
 
-  LAST_ORDER = { nr: srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge };
+  try{
+    if (f.remember.checked) localStorage.setItem("ae_kunde", JSON.stringify({ name: f.name.value.trim(), phone: f.phone.value.trim(), dob: f.dob.value, pay: f.pay.value }));
+    else localStorage.removeItem("ae_kunde");
+  }catch(x){}
+  LAST_ORDER = { code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge };
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });
 });
@@ -743,6 +773,7 @@ const LEGAL = {
     <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
   datenschutz: `<h2>Datenschutz</h2>
     <p>Wir verarbeiten Name, Telefonnummer, Treffpunkt, Geburtsdatum und – nur wenn du ihn freigibst – deinen aktuellen Standort ausschließlich zur Abwicklung und Altersprüfung deiner Bestellung (Art. 6 Abs. 1 lit. b und c DSGVO). Die Bestellung wird per WhatsApp oder E-Mail an uns übermittelt. Der Warenkorb wird nur lokal in deinem Browser gespeichert.</p>
+    <p>Daten merken: Wenn du es auswählst, speichern wir Name, Handynummer, Geburtsdatum und Zahlungsart nur lokal in deinem Browser auf diesem Gerät, damit das Formular beim nächsten Mal ausgefüllt ist. Mit „Nicht du?“ löschst du sie jederzeit.</p>
     <p>Feedback-Formular: Deinen Vorschlag und, falls angegeben, deinen Kontakt speichern wir, um das Sortiment zu verbessern und dir gegebenenfalls zu antworten (Art. 6 Abs. 1 lit. f DSGVO). Wir löschen Feedback spätestens nach 12 Monaten.</p>
     <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`
 };
