@@ -304,7 +304,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-belegwa";
+const APP_VERSION = "2026-11-02-teamedit";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -327,7 +327,7 @@ function waPhone(p){
 }
 const wa = (tel, text) => `https://wa.me/${waPhone(tel)}?text=${encodeURIComponent(text)}`;
 
-let ROLE = "admin", MY_EVENT = null, TEAM = [];
+let ROLE = "admin", MY_EVENT = null, TEAM = [], MY_EMAIL = "";
 const isChef = () => ROLE === "admin";
 const isLager = () => ROLE === "lager";
 const isZust = () => ROLE === "fahrer";            // Zusteller (intern weiter "fahrer")
@@ -371,6 +371,7 @@ let started = false;
 async function start(){
   const { data:{ session } } = await sb.auth.getSession();
   if (!session) return show("loginView");
+  MY_EMAIL = (session.user && session.user.email || "").toLowerCase();
   const { data: admin } = await sb.rpc("is_admin");
   if (!admin) return show("denyView");
   ME = (await sb.rpc("team_name")).data || "";
@@ -730,12 +731,55 @@ function renderTeam(){
           <tr><td>Dieser Monat</td><td class="n">${month.length}</td><td class="n">${eur(sumBy(month,"bar"))}</td><td class="n">${eur(sumBy(month,"karte"))}</td></tr></table>
         ${mine.length ? `<p style="margin:4px 0 0;font-weight:700;font-size:14px">Lieferungen (letzte 18 h)</p>
         <ul class="lines" style="margin:0">${mine.map(o => `<li><span>${fmtT(o.beleg_am)} · #${oc(o)} · ${esc(o.kunde_name)}</span><span>${eur(o.gesamt)} ${o.zahlart==="bar"?"bar":"Karte"}</span></li>`).join("")}</ul>` : ""}
-        <p class="muted" style="font-size:13px;margin:0">Rolle ändern oder entfernen: kurz Claude schreiben.</p>
+        <div class="tm-edit" style="display:grid;gap:8px;border-top:1px solid #E1DEF7;padding-top:12px">
+          <strong style="font-size:14px">Bearbeiten</strong>
+          <label style="font-size:14px">Name <input data-tm-name value="${esc(t.name||"")}" style="margin-top:4px"></label>
+          ${t.email.toLowerCase() === MY_EMAIL ? `<p class="muted" style="font-size:13px;margin:0">Das bist du – deine eigene Rolle kannst du nicht ändern.</p>` : `
+          <div style="font-size:14px;font-weight:600">Rolle</div>
+          <div class="seg" data-tm-rolle>${["admin","lager","fahrer"].map(k => `<button type="button" data-r="${k}" class="${t.rolle===k?"on":""}">${ROLLEN[k]}</button>`).join("")}</div>`}
+          <div class="btns">
+            <button class="btn sm" data-tm-save="${esc(t.email)}">Speichern</button>
+            ${t.email.toLowerCase() === MY_EMAIL ? "" : `<button class="btn o sm" data-tm-del="${esc(t.email)}">Entfernen</button>`}
+          </div>
+          <div class="note hidden" data-tm-msg role="status"></div>
+          <p class="muted" style="font-size:12px;margin:0">Neue Personen anlegen: Claude Name, E-Mail und Rolle schicken.</p>
+        </div>
       </div>` : ""}
     </div>`;
   }).join("") || `<p class="muted">Noch niemand angelegt.</p>`;
 }
-$("teamList").addEventListener("click", e => { const c = e.target.closest("[data-tm]"); if (!c) return; teamOpen = teamOpen === c.dataset.tm ? null : c.dataset.tm; renderTeam(); });
+$("teamList").addEventListener("click", async e => {
+  const card = e.target.closest("[data-tm]"); if (!card) return;
+  if (e.target.closest(".tm-edit")){
+    const msg = card.querySelector("[data-tm-msg]");
+    const rb = e.target.closest("[data-tm-rolle] button");
+    if (rb){ card.querySelectorAll("[data-tm-rolle] button").forEach(b => b.classList.toggle("on", b === rb)); return; }
+    const sv = e.target.closest("[data-tm-save]");
+    if (sv){
+      const email = sv.dataset.tmSave, t = TEAM.find(x => x.email === email);
+      const name = card.querySelector("[data-tm-name]").value.trim();
+      const on = card.querySelector("[data-tm-rolle] button.on"), rolle = on ? on.dataset.r : t.rolle;
+      if (!name) return note(msg, "Bitte einen Namen eingeben.");
+      sv.disabled = true;
+      const { data, error } = await sb.from("admins").update({ name, rolle }).eq("email", email).select();
+      sv.disabled = false;
+      if (error || !data || !data.length) return note(msg, "Konnte nicht gespeichert werden" + (error ? ": " + error.message : "."));
+      await sb.from("protokoll").insert({ wer: ME, aktion: "team_geaendert", details: { email, name, rolle, vorher: { name: t.name, rolle: t.rolle } } });
+      toast(`${name} ist jetzt ${ROLLEN[rolle]}.`); loadTeam(); return;
+    }
+    const dl = e.target.closest("[data-tm-del]");
+    if (dl){
+      const email = dl.dataset.tmDel, t = TEAM.find(x => x.email === email);
+      if (dl.dataset.confirm !== "1"){ dl.dataset.confirm = "1"; dl.textContent = "Wirklich entfernen?"; return; }
+      const { data, error } = await sb.from("admins").delete().eq("email", email).select();
+      if (error || !data || !data.length) return note(msg, "Konnte nicht entfernt werden" + (error ? ": " + error.message : "."));
+      await sb.from("protokoll").insert({ wer: ME, aktion: "team_entfernt", details: { email, name: t.name, rolle: t.rolle } });
+      teamOpen = null; toast(`${t.name || email} hat keinen Zugriff mehr.`); loadTeam(); return;
+    }
+    return;
+  }
+  teamOpen = teamOpen === card.dataset.tm ? null : card.dataset.tm; renderTeam();
+});
 $("teamList").addEventListener("keydown", e => { if (e.key === "Enter" && e.target.matches("[data-tm]")) e.target.click(); });
 /* Bestellungen, die ohne Datenbank kamen (Shop offline) */
 function renderLegacy(){
