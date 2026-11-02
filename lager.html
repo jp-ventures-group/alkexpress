@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-01-ranking";
+const APP_VERSION = "2026-11-02-wa";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -483,11 +483,11 @@ function orderDetail(o){
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
       <div class="btns">
-        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! 🍻 Wir sind in ca. 10 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}, bar oder Karte.`)}">Bestätigen · 10 Min</a>
-        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! 🍻 Gerade ist viel los, wir sind in ca. 20 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}.`)}">Bestätigen · 20 Min</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! Wir sind in ca. 10 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}, bar oder Karte.`)}">Bestätigen · 10 Min</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, danke für deine Bestellung #${o.nr} bei AlkExpress! Gerade ist viel los, wir sind in ca. 20 Minuten bei dir (${o.treffpunkt}). Bitte halte deinen Ausweis bereit. Gesamt: ${eur(o.gesamt)}.`)}">Bestätigen · 20 Min</a>
         ${o.status === "eingegangen" ? `<button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : ""}
         <a class="btn wa" target="_blank" rel="noopener" data-act="unterwegs" data-id="${o.id}" href="${wa(o.kunde_tel, `Hi ${first}, wir sind jetzt da! Wo genau bist du? Ausweis bitte bereithalten.`)}">Bin da</a>
-        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, bei deiner Bestellung #${o.nr} (${items}) ist leider etwas ausverkauft. Wir melden uns gleich mit einer Alternative, okay?`)}">Etwas ausverkauft</a>
+        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, `Hi ${first}, bei deiner Bestellung #${o.nr} ist leider etwas nicht mehr verfügbar. Wir rufen dich gleich an, okay?`)}">Etwas ausverkauft</a>
       </div>
     </div>` : ""}
     <div class="sec">
