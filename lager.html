@@ -102,8 +102,10 @@ table.t{width:100%;border-collapse:collapse;font-size:15px;font-variant-numeric:
 table.t th,table.t td{text-align:left;padding:7px 4px;border-bottom:1px solid #E1DEF7}
 table.t td.n,table.t th.n{text-align:right}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:6;background:rgba(30,27,75,.97);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
-nav.tabs .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr)}
-nav.tabs button{background:none;border:0;padding:12px 4px 14px;font-weight:700;font-size:14px;color:var(--muted);cursor:pointer;position:relative}
+nav.tabs .in{max-width:640px;margin:0 auto;display:flex}
+nav.tabs .in button{flex:1 1 0;min-width:0}
+nav.tabs .in button.hidden{display:none}
+nav.tabs button{background:none;border:0;padding:12px 2px 14px;font-weight:700;font-size:13px;white-space:nowrap;color:var(--muted);cursor:pointer;position:relative}
 nav.tabs button.on{color:var(--paper)}
 nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%;height:3px;border-radius:0 0 3px 3px;background:var(--y)}
 nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;border-radius:999px;background:var(--r);color:#fff;font-size:12px;margin-left:4px}
@@ -290,7 +292,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 <div class="save hidden" id="saveBar"><button class="btn y" id="saveBtn">Änderungen speichern</button></div>
 
 <nav class="tabs hidden" id="tabs"><div class="in">
-  <button data-tab="best" class="on">Bestellungen<span class="cnt hidden" id="cntOffen"></span></button>
+  <button data-tab="best" class="on">Bestellung<span class="cnt hidden" id="cntOffen"></span></button>
   <button data-tab="lager">Lager</button>
   <button data-tab="events">Events</button>
   <button data-tab="kassa">Kassa</button>
@@ -302,7 +304,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-lager";
+const APP_VERSION = "2026-11-02-tabs";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
