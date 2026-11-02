@@ -275,14 +275,14 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
   </section>
   <section id="tab-team" class="tab hidden">
     <h1>Team</h1>
-    <p class="muted" style="font-size:15px">Admins sehen und dürfen alles. Fahrer sehen nur bestätigte Bestellungen ihres Events, liefern und kassieren.</p>
+    <p class="muted" style="font-size:15px">Admins sehen und dürfen alles. Lager nimmt Bestellungen an und packt sie. Zusteller sehen nur bestätigte Bestellungen ihres Events, liefern und kassieren.</p>
     <div id="teamList"></div>
     <h2 style="margin-top:26px">Kunden-Feedback</h2>
     <div class="chips" id="fbFilter"><button class="chip on" data-f="neu">Neu</button><button class="chip" data-f="alle">Alle</button></div>
     <div id="fbList"></div>
     <div class="card">
       <h2>Person hinzufügen</h2>
-      <p style="margin:0;font-size:15px">Schick Claude Name, E-Mail, Rolle (Admin oder Fahrer) und ein Startpasswort. Die Person kann ihr Passwort danach oben unter „Passwort“ selbst ändern.</p>
+      <p style="margin:0;font-size:15px">Schick Claude Name, E-Mail, Rolle (Admin, Lager oder Zusteller) und ein Startpasswort. Die Person kann ihr Passwort danach oben unter „Passwort“ selbst ändern.</p>
     </div>
   </section>
 </main>
@@ -302,7 +302,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-sumup";
+const APP_VERSION = "2026-11-02-lager";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -327,6 +327,10 @@ const wa = (tel, text) => `https://wa.me/${waPhone(tel)}?text=${encodeURICompone
 
 let ROLE = "admin", MY_EVENT = null, TEAM = [];
 const isChef = () => ROLE === "admin";
+const isLager = () => ROLE === "lager";
+const isZust = () => ROLE === "fahrer";            // Zusteller (intern weiter "fahrer")
+const canAccept = () => isChef() || isLager();
+const ROLLEN = { admin:"Admin", lager:"Lager", fahrer:"Zusteller" };
 let ME = "", rows = [], edits = {}, events = [], orders = [], SET = null, openId = null, seenIds = new Set();
 const GROUPS = [["p","Pakete"],["b","Bier & Cider"],["w","Wein & Sekt"],["s","Spirituosen & Mischgetränke"],["n","Ohne Alkohol & Zubehör"]];
 const STATUS = { eingegangen:"Neu", bestaetigt:"Bestätigt", unterwegs:"Unterwegs", geliefert:"Geliefert", abgelehnt:"Abgelehnt", storniert:"Storniert" };
@@ -370,7 +374,7 @@ async function start(){
   ME = (await sb.rpc("team_name")).data || "";
   ROLE = (await sb.rpc("meine_rolle")).data || "fahrer";
   MY_EVENT = (await sb.rpc("mein_event")).data || null;
-  $("who").textContent = ME + (isChef() ? " · Admin" : " · Fahrer"); $("ver").textContent = "v" + APP_VERSION.slice(-7);
+  $("who").textContent = ME + " · " + (ROLLEN[ROLE] || ROLE); $("ver").textContent = "v" + APP_VERSION.slice(-7);
   document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
   $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
   show("app"); goTab(isChef() ? (sessionStorage.getItem("ae_tab") || "best") : "best");
@@ -403,7 +407,7 @@ async function loadOrders(){
   const since = new Date(Date.now() - 45*864e5).toISOString();
   const { data, error } = await sb.from("bestellungen").select("*").gt("created_at", since).order("created_at", { ascending:false }).limit(500);
   if (error) return;
-  const fresh = data.filter(o => o.status === (isChef() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id));
+  const fresh = data.filter(o => o.status === (canAccept() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id));
   if (seenIds.size && fresh.length) alertNew(fresh[0]);
   data.forEach(o => seenIds.add(o.id)); if (!data.length) seenIds.add("-");
   orders = data; renderOrders(); updSum(); renderFahrer();
@@ -432,8 +436,8 @@ function renderOrders(){
 function ageBadge(o){ return o.max_alter >= 18 ? '<span class="badge age">18+</span>' : o.max_alter >= 16 ? '<span class="badge" style="background:var(--y);color:var(--ink)">16+</span>' : ""; }
 function packBadge(o){
   if (!["bestaetigt","unterwegs"].includes(o.status)) return "";
-  return (isChef() && !o.gepackt ? '<span class="badge" style="background:var(--y);color:var(--ink)">packen</span>' : "")
-    + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isChef() ? "" : '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>'));
+  return (canAccept() ? (o.gepackt ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">gepackt</span>' : '<span class="badge" style="background:var(--y);color:var(--ink)">packen</span>') : "")
+    + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isZust() ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>' : ""));
 }
 const oc = o => o.code || o.nr;
 const MSG = {
@@ -474,15 +478,27 @@ function orderDetail(o){
       ${o.pfand>0?`<li><span>Pfand (${pfStk}×)</span><span>${eur(o.pfand)}</span></li>`:""}
       ${o.pfand_retour>0?`<li><span>Leergut retour (${o.leergut_stk}×)</span><span>− ${eur(o.pfand_retour)}</span></li>`:""}
       <li class="tot"><span>Gesamt${o.zahlart && o.status==="geliefert"?` · ${o.zahlart==="bar"?"bar":"Karte"}`:""}</span><span>${eur(o.gesamt)}</span></li></ul>
-    ${!done && isChef() && o.status !== "eingegangen" ? `
+    ${!done && isLager() ? `
     <div class="sec">
-      <strong style="font-size:15px">Auto &amp; Fahrer</strong>
+      <strong style="font-size:15px">1 · Annehmen</strong>
+      <div class="btns">
+        ${o.status === "eingegangen" ? `
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
+        <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
+        <button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : `<span style="align-self:center">✓ Angenommen</span>`}
+        ${waBtn(o, "Etwas ausverkauft", MSG.weg(o, first))}
+      </div>
+      <p class="muted" style="font-size:13px;margin:2px 0 0">Ablehnen kann nur ein Admin. Ist etwas aus, Kunden kurz informieren und den Admin anrufen.</p>
+    </div>` : ""}
+    ${!done && canAccept() && o.status !== "eingegangen" ? `
+    <div class="sec">
+      <strong style="font-size:15px">${isLager() ? "2 · Packen" : "Packen &amp; Zusteller"}</strong>
       <div class="btns">
         <button class="btn ${o.gepackt ? "o" : "y"} sm" data-pack="${o.id}">${o.gepackt ? "✓ Gepackt" : "Als gepackt markieren"}</button>
-        <span style="align-self:center">${o.fahrer ? `Liefert: <strong>${esc(o.fahrer)}</strong>` : "Noch kein Fahrer"}</span>
+        <span style="align-self:center">${o.fahrer ? `Liefert: <strong>${esc(o.fahrer)}</strong>` : "Noch kein Zusteller"}</span>
       </div>
     </div>` : ""}
-    ${!done && !isChef() ? `
+    ${!done && isZust() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Liefern</strong>
       <div class="btns">
@@ -497,7 +513,7 @@ function orderDetail(o){
       </div>
       <p class="muted" style="font-size:13px;margin:2px 0 0">Öffnet sich dein privates WhatsApp? Dann „Kopieren“ tippen und den Text in WhatsApp Business einfügen.</p>` : ""}
     </div>` : ""}
-    ${!done && (isChef() || o.fahrer) ? `${isChef() ? `
+    ${!done && (isChef() || (isZust() && o.fahrer)) ? `${isChef() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
       <div class="btns">
@@ -581,7 +597,7 @@ $("bestList").addEventListener("click", async e => {
     loadOrders(); return; }
   const pack = e.target.closest("[data-pack]");
   if (pack){ const o = orders.find(x => x.id === pack.dataset.pack);
-    const { error } = await sb.from("bestellungen").update({ gepackt: !o.gepackt }).eq("id", o.id);
+    const { error } = await sb.rpc("bestellung_gepackt", { b_id: o.id, wert: !o.gepackt });
     if (error) toast(error.message); loadOrders(); return; }
   const fin = e.target.closest("[data-finish]");
   if (fin){
@@ -625,7 +641,7 @@ $("qrClose").onclick = () => { $("qrModal").classList.add("hidden"); try{ showQr
 /* ================= Fahrer: Check-in & meine Kasse ================= */
 function renderFahrer(){
   const box = $("fahrerCard"); if (!box) return;
-  if (isChef()){ box.innerHTML = ""; return; }
+  if (!isZust()){ box.innerHTML = ""; return; }
   const now = Date.now();
   const relevant = events.filter(e => e.aktiv !== false && new Date(e.liefer_bis) > now && new Date(e.liefer_von) - now < 18*36e5);
   const mine = events.find(e => e.id === MY_EVENT);
@@ -692,7 +708,7 @@ function renderTeam(){
     const bar = mine.filter(o => o.zahlart === "bar").reduce((s,o)=>s+Number(o.gesamt),0);
     return `<div class="card" style="padding:14px 16px">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:center">
-        <div><strong>${esc(name)}</strong> <span class="badge" style="background:${t.rolle==="admin"?"var(--ink)":"var(--y)"};color:${t.rolle==="admin"?"#fff":"var(--ink)"}">${t.rolle==="admin"?"Admin":"Fahrer"}</span>
+        <div><strong>${esc(name)}</strong> <span class="badge" style="background:${t.rolle==="admin"?"var(--ink)":t.rolle==="lager"?"#4FD6A8":"var(--y)"};color:${t.rolle==="admin"?"#fff":"var(--ink)"}">${ROLLEN[t.rolle]||t.rolle}</span>
           <div class="muted" style="font-size:14px">${esc(t.email)}</div>
           <div style="font-size:14px;margin-top:4px">${ev ? `🟢 dabei: ${esc(ev.name)}` : "nicht eingecheckt"} · ${mine.length} Lieferungen, bar ${eur(bar)}</div></div>
         </div></div>`;
