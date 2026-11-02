@@ -115,7 +115,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
 </style>
 </head>
 <body>
-<header><div class="bar"><div class="logo">Alk<b>Express</b> Team <small id="ver" style="font-size:10px;opacity:.5;font-weight:500"></small></div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout">Abmelden</button></div></div></header>
+<header><div class="bar"><div class="logo">Alk<b>Express</b> Team <small id="ver" style="font-size:10px;opacity:.5;font-weight:500"></small></div><div style="display:flex;gap:10px;align-items:center"><span class="who" id="who"></span><button class="ghost hidden" id="pwBtn" aria-label="Passwort ändern" title="Passwort ändern">🔑</button><button class="ghost hidden" id="logout" aria-label="Abmelden" title="Abmelden">🚪</button></div></div></header>
 <div class="toast hidden" id="toast" role="status"></div>
 <div class="qrwrap hidden" id="qrModal" role="dialog" aria-modal="true" aria-labelledby="qrTitle">
   <div class="qrbox">
@@ -304,7 +304,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-02-teamedit";
+const APP_VERSION = "2026-11-02-ansicht";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -327,7 +327,7 @@ function waPhone(p){
 }
 const wa = (tel, text) => `https://wa.me/${waPhone(tel)}?text=${encodeURIComponent(text)}`;
 
-let ROLE = "admin", MY_EVENT = null, TEAM = [], MY_EMAIL = "";
+let ROLE = "admin", REAL_ROLE = "admin", MY_EVENT = null, TEAM = [], MY_EMAIL = "";
 const isChef = () => ROLE === "admin";
 const isLager = () => ROLE === "lager";
 const isZust = () => ROLE === "fahrer";            // Zusteller (intern weiter "fahrer")
@@ -375,13 +375,13 @@ async function start(){
   const { data: admin } = await sb.rpc("is_admin");
   if (!admin) return show("denyView");
   ME = (await sb.rpc("team_name")).data || "";
-  ROLE = (await sb.rpc("meine_rolle")).data || "fahrer";
+  REAL_ROLE = (await sb.rpc("meine_rolle")).data || "fahrer";
+  ROLE = REAL_ROLE;
+  if (REAL_ROLE === "admin"){ try{ const v = localStorage.getItem("ae_ansicht"); if (["admin","lager","fahrer"].includes(v)) ROLE = v; }catch(x){} }
   MY_EVENT = (await sb.rpc("mein_event")).data || null;
-  $("who").textContent = ME + " · " + (ROLLEN[ROLE] || ROLE); $("ver").textContent = "v" + APP_VERSION.slice(-7);
-  document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
-  $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
-  show("app"); goTab(isChef() ? (sessionStorage.getItem("ae_tab") || "best") : "best");
-  await Promise.all([loadLager(), loadEvents(), loadOrders(), loadSettings(), isChef() ? loadTeam() : null]);
+  $("ver").textContent = "v" + APP_VERSION.slice(-7);
+  applyRole();
+  await Promise.all([loadLager(), loadEvents(), loadOrders(), loadSettings(), REAL_ROLE === "admin" ? loadTeam() : null]);
   const op = sessionStorage.getItem("ae_open"); if (op){ sessionStorage.removeItem("ae_open"); openId = op; goTab("best"); renderOrders(); updSum(); }
   renderLegacy();
   if (!started){ started = true;
@@ -410,7 +410,7 @@ async function loadOrders(){
   const since = new Date(Date.now() - 45*864e5).toISOString();
   const { data, error } = await sb.from("bestellungen").select("*").gt("created_at", since).order("created_at", { ascending:false }).limit(500);
   if (error) return;
-  const fresh = data.filter(o => o.status === (canAccept() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id));
+  const fresh = data.filter(o => o.status === (canAccept() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id) && sichtbar(o));
   if (seenIds.size && fresh.length) alertNew(fresh[0]);
   data.forEach(o => seenIds.add(o.id)); if (!data.length) seenIds.add("-");
   orders = data; renderOrders(); updSum(); renderFahrer();
@@ -424,15 +424,35 @@ function alertNew(o){
 $("bestFilter").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; bestFilter = b.dataset.f;
   document.querySelectorAll("#bestFilter .chip").forEach(c => c.classList.toggle("on", c===b)); renderOrders(); };
 
+/* Ansicht wechseln (nur Admins): gleiche Rechte, aber Oberfläche wie Lager oder Zusteller */
+function applyRole(){
+  const w = $("who");
+  if (REAL_ROLE === "admin"){
+    w.innerHTML = `<select id="viewSel" aria-label="Ansicht" style="background:transparent;color:inherit;border:1px solid var(--line);border-radius:999px;padding:4px 8px;font:inherit;font-size:13px">${["admin","lager","fahrer"].map(k => `<option value="${k}" ${ROLE===k?"selected":""} style="color:#1E1B4B">${ROLLEN[k]}</option>`).join("")}</select>`;
+    $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(o=>o.id)); renderOrders(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`); };
+  } else w.textContent = ME + " · " + (ROLLEN[ROLE] || ROLE);
+  document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
+  $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
+  show("app"); goTab(isChef() ? (sessionStorage.getItem("ae_tab") || "best") : "best");
+}
+/* Admin in Lager-/Zusteller-Ansicht: sieht nur, was diese Rolle sehen würde */
+function sichtbar(o){
+  if (ROLE === REAL_ROLE || isChef()) return true;
+  if (isLager()) return ["eingegangen","bestaetigt","unterwegs"].includes(o.status) || Date.now() - new Date(o.created_at) < 18*36e5;
+  if (isZust()) return (["bestaetigt","unterwegs"].includes(o.status) && o.event_id === MY_EVENT && (!o.fahrer || o.fahrer === ME))
+    || (o.status === "geliefert" && o.fahrer === ME && Date.now() - new Date(o.beleg_am) < 18*36e5);
+  return true;
+}
 function renderOrders(){
   const today = new Date().toDateString();
   const isOpen = o => ["eingegangen","bestaetigt","unterwegs"].includes(o.status);
-  const offen = orders.filter(isOpen);
+  const alle = orders; const orders_ = alle.filter(sichtbar);
+  const offen = orders_.filter(isOpen);
   const cnt = $("cntOffen"); cnt.textContent = offen.length; cnt.classList.toggle("hidden", !offen.length);
   let list = bestFilter === "offen" ? offen.slice().reverse()
-    : bestFilter === "heute" ? orders.filter(o => !isOpen(o) && new Date(o.updated_at).toDateString() === today)
-    : orders;
-  const op = orders.find(o => o.id === openId); if (op && !list.includes(op)) list = [op, ...list];
+    : bestFilter === "heute" ? orders_.filter(o => !isOpen(o) && new Date(o.updated_at).toDateString() === today)
+    : orders_;
+  const op = orders_.find(o => o.id === openId); if (op && !list.includes(op)) list = [op, ...list];
   $("bestList").innerHTML = list.length ? list.map(o => o.id === openId ? orderDetail(o) : orderRow(o)).join("")
     : `<p class="muted">${bestFilter === "offen" ? "Keine offenen Bestellungen. Neue erscheinen hier automatisch, mit Ton und Vibration." : "Nichts in diesem Zeitraum."}</p>`;
 }
