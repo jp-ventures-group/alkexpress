@@ -201,6 +201,9 @@ form{display:grid;gap:14px}
 label{display:grid;gap:6px;font-weight:700;font-size:15px;min-width:0}
 .req{color:var(--band18);font-weight:800;margin-left:2px} .opt{font-weight:500;color:#6B6799;font-size:14px}
 .reqnote{margin:0 0 4px;font-size:13px;color:#6B6799}
+.prebox{display:grid;gap:8px;background:#FFF7E0;border:1.5px dashed #FFC83D;border-radius:var(--r-sm);padding:12px}
+.prebox small{color:#5A5690;font-size:13px;line-height:1.4}
+.pre-btn{margin-top:6px;border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer}
 .bad input:not([type=checkbox]),.bad textarea,.bad select{border-color:var(--band18)!important;background:#FFF1F0}
 .check.bad span,.loc.bad strong{color:var(--band18)}
 .d-body form{min-width:0} .d-body select,.d-body input,.d-body textarea{max-width:100%;min-width:0;box-sizing:border-box} .d-body select{width:100%;text-overflow:ellipsis}
@@ -350,6 +353,11 @@ dialog p{margin:0 0 18px}
       <label><span>Name <b class="req" aria-hidden="true">*</b></span><input name="name" autocomplete="name" required></label>
       <label><span>Handynummer <b class="req" aria-hidden="true">*</b></span><small>für WhatsApp-Rückmeldung und damit dich der Fahrer anrufen kann</small><input name="phone" type="tel" autocomplete="tel" required></label>
       <label><span>Event <b class="req" aria-hidden="true">*</b></span><select name="event" required></select></label>
+      <div class="prebox" id="preBox" hidden>
+        <strong>📅 Vorbestellung</strong>
+        <small id="preTxt"></small>
+        <label><span>Wunschzeit <span class="opt">(optional)</span></span><select name="wunsch"></select></label>
+      </div>
       <div class="loc">
         <strong style="font-size:15px">Standort <b class="req" aria-hidden="true">*</b></strong>
         <small style="color:#5A5690">Wir liefern nur im Umkreis der Location. Wird beim Abschicken automatisch geprüft, dein Handy fragt dann nach Erlaubnis. Dein Standort wird nur für diese Bestellung verwendet.</small>
@@ -387,7 +395,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-sortiment2";
+const SITE_VERSION = "2026-11-03-vorbestellen";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -517,6 +525,30 @@ const avail = id => (STOCK && id in STOCK) ? STOCK[id] : Infinity;
 let EVENTS = [], LOC = null;
 const sbHeaders = { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` };
 const liveEvents = (now = new Date()) => EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) <= now && now < new Date(e.liefer_bis));
+/* Vorbestellung: kommende Events, nur mit Online-Zahlung */
+const preEvents = (now = new Date()) => (typeof ONLINE !== "undefined" && ONLINE.aktiv) ? EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) > now) : [];
+const selEventId = () => document.querySelector("[name=event]").value;
+const selEvent = () => liveEvents().find(e => e.id === selEventId()) || preEvents().find(e => e.id === selEventId());
+const isPre = () => !liveEvents().some(e => e.id === selEventId()) && preEvents().some(e => e.id === selEventId());
+let MODE_EV = null;
+function applyMode(){
+  const pre = isPre(), ev = selEvent(), pay = document.querySelector("[name=pay]");
+  document.getElementById("preBox").hidden = !pre;
+  document.querySelector(".loc").hidden = pre;
+  if (pre){
+    if (!pay.disabled) pay.dataset.prev = pay.value;
+    let o = pay.querySelector('option[value="online"]');
+    if (!o){ o = new Option("Online zahlen (Karte, Apple Pay)", "online"); pay.insertBefore(o, pay.firstChild); }
+    pay.value = "online"; pay.disabled = true;
+  } else if (pay.disabled){ pay.disabled = false; if (pay.dataset.prev && pay.querySelector(`option[value="${pay.dataset.prev}"]`)) pay.value = pay.dataset.prev; }
+  if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online (Vorbestellungen ohne Rabatt). Wir liefern am Event-Abend zu deiner Wunschzeit, <b>nur im Umkreis von ${ev.radius_m} m um ${esc(ev.ort)}</b>, und melden uns vorher per WhatsApp.`;
+  if (pre && ev && MODE_EV !== ev.id){
+    const w = document.querySelector("[name=wunsch]"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis), opts = ['<option value="">So früh wie möglich</option>'];
+    for (let t = new Date(a); t < b; t = new Date(t.getTime() + 30*60e3)) opts.push(`<option value="${t.toISOString()}">ab ${fmtTime(t)} Uhr</option>`);
+    w.innerHTML = opts.join("");
+  }
+  MODE_EV = pre && ev ? ev.id : null;
+}
 const fmtDay = d => d.toLocaleDateString("de-AT", { weekday:"short", day:"2-digit", month:"2-digit" });
 const fmtTime = d => d.toLocaleTimeString("de-AT", { hour:"2-digit", minute:"2-digit" });
 const esc = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -572,11 +604,17 @@ function renderEvents(){
     const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), isLive = a <= now && now < b;
     return `<li><div class="d">${fmtDay(a)}<small>${fmtTime(a)}–${fmtTime(b)}</small></div>
       <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}</div>
-      <div class="o">${esc(e.ort)} · Lieferung im Umkreis von ${e.radius_m} m</div></li>`;
+      <div class="o">${esc(e.ort)} · Lieferung im Umkreis von ${e.radius_m} m</div>${!isLive && ONLINE.aktiv ? `<button type="button" class="pre-btn" data-pre="${e.id}">Jetzt vorbestellen</button>` : ""}</li>`;
   }).join("") : `<li class="empty-ev">Gerade sind keine Events geplant. Folg uns auf Instagram, dann verpasst du das nächste nicht.</li>`;
   const sel = document.querySelector("[name=event]"), prev = sel.value;
-  sel.innerHTML = live.length ? live.map(e => `<option value="${e.id}">${esc(e.name)} (${esc(e.ort)})</option>`).join("") : `<option value="">Gerade keine Lieferung</option>`;
-  if (live.some(e => e.id === prev)) sel.value = prev;
+  const pre = preEvents(now);
+  sel.innerHTML = (live.length || pre.length)
+    ? live.map(e => `<option value="${e.id}">${esc(e.name)} (${esc(e.ort)}) · jetzt</option>`).join("")
+      + pre.map(e => { const a = new Date(e.liefer_von); return `<option value="${e.id}">Vorbestellen: ${esc(e.name)} · ${fmtDay(a)} ab ${fmtTime(a)}</option>`; }).join("")
+    : `<option value="">Gerade keine Lieferung</option>`;
+  if ([...live, ...pre].some(e => e.id === prev)) sel.value = prev;
+  if (!live.length && pre.length && ONLINE.aktiv){ const st2 = document.getElementById("statusSub"); if (!st2.textContent.includes("vorbestellen")) st2.textContent += " · Jetzt schon vorbestellen!"; }
+  applyMode();
   if (LOC && LOC.event !== sel.value) { LOC = null; document.getElementById("locRes").textContent = ""; }
   render();
 }
@@ -606,7 +644,12 @@ function checkLoc(){
   });
 }
 document.getElementById("locBtn").addEventListener("click", () => checkLoc());
-document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; });
+document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; applyMode(); render(); });
+document.getElementById("eventList").addEventListener("click", e => {
+  const b = e.target.closest("[data-pre]"); if (!b) return;
+  document.querySelector("[name=event]").value = b.dataset.pre; applyMode(); render(); openCart();
+  setTimeout(() => document.querySelector("[name=event]").scrollIntoView({ block:"center", behavior:"smooth" }), 300);
+});
 
 /* Katalog rendern */
 const cat = document.getElementById("catalog");
@@ -644,7 +687,7 @@ function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
 let ONLINE = { aktiv:false, rabatt:0 };
 const payOnline = () => ONLINE.aktiv && document.querySelector("[name=pay]").value === "online";
 function basePrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
-function unitPrice(id){ const b = basePrice(id); return payOnline() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
+function unitPrice(id){ const b = basePrice(id); return payOnline() && !isPre() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
 async function loadOnline(){
   try{
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/einstellungen?select=online_aktiv,online_rabatt&id=eq.1`, { headers: sbHeaders, cache:"no-store" });
@@ -655,7 +698,7 @@ async function loadOnline(){
   if (ONLINE.aktiv && !have){ const o = new Option(`Online zahlen${ONLINE.rabatt ? ` −${String(ONLINE.rabatt).replace(".", ",")} %` : ""} (Karte, Apple Pay)`, "online"); sel.insertBefore(o, sel.firstChild);
     if (!SAVED_PAY || SAVED_PAY === "online") sel.value = "online"; }
   if (!ONLINE.aktiv && have) have.remove();
-  render();
+  renderEvents();
 }
 document.querySelector("[name=pay]").addEventListener("change", render);
 function totals(){
@@ -694,22 +737,25 @@ function render(){
   if (!t.n){
     v.innerHTML = LAST_ORDER ? `<div class="ok-box">
         <div style="font-size:34px;line-height:1">✅</div>
-        ${LAST_ORDER.online && !LAST_ORDER.bezahlt ? `<h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code}: Zahlung offen</h3>
-        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>. Deine Bestellung geht erst los, wenn sie bezahlt ist. Ohne Zahlung wird sie nach 30 Minuten storniert.</p>
+        ${LAST_ORDER.online && !LAST_ORDER.bezahlt ? `<h3 style="margin:8px 0 4px">${LAST_ORDER.pre ? "Vorbestellung" : "Bestellung"} #${LAST_ORDER.code}: Zahlung offen</h3>
+        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>. ${LAST_ORDER.pre ? "Deine Vorbestellung gilt erst, wenn sie bezahlt ist." : "Deine Bestellung geht erst los, wenn sie bezahlt ist."} Ohne Zahlung wird sie nach 30 Minuten storniert.</p>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn1" id="payNow">Jetzt bezahlen</button><button type="button" class="btn2" id="payCheck">Ich habe bezahlt</button></div>
         <p class="q" id="payMsg" style="margin:8px 0 0"></p>`
+        : LAST_ORDER.pre ? `<h3 style="margin:8px 0 4px">Vorbestellung #${LAST_ORDER.code} ist bezahlt</h3>
+        <p style="margin:0">${LAST_ORDER.event ? `Für <b>${esc(LAST_ORDER.event)}</b>. ` : ""}Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>, online bezahlt ✅. Am Event-Abend melden wir uns per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel || "deiner Nummer")} und bringen dir alles vor die Location.</p>`
         : `<h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code} ist eingegangen</h3>
         <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>${LAST_ORDER.online ? ", <b>online bezahlt</b> ✅ – bei der Übergabe zahlst du nichts mehr." : ", bar oder Karte bei der Übergabe."}</p>`}
-        <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er ${LAST_ORDER.meet ? `bei „${esc(LAST_ORDER.meet)}“` : "da"} ist.</p>
+        ${LAST_ORDER.pre ? "" : `<p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er ${LAST_ORDER.meet ? `bei „${esc(LAST_ORDER.meet)}“` : "da"} ist.</p>`}
         ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
       </div>`
       : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
     v.innerHTML = (t.voll < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.voll)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.voll/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
-      ${ONLINE.aktiv && !payOnline() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
+      ${ONLINE.aktiv && !payOnline() && !isPre() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
+        ${isPre() ? `<div><span>📅 Vorbestellung · online, ohne Rabatt</span><span></span></div>` : ""}
         ${payOnline() && t.voll > t.sub ? `<div><span>Online-Rabatt (${String(ONLINE.rabatt).replace(".", ",")} %)</span><span>− ${eur(t.voll - t.sub)}</span></div>` : ""}
         <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
         <div><span>Lieferung</span><span>${CONFIG.fee ? eur(CONFIG.fee) : "gratis"}</span></div>
@@ -718,7 +764,8 @@ function render(){
         <div class="tot"><span>Gesamt</span><span>${eur(t.total)}</span></div>
       </div>`;
   }
-  document.getElementById("send").disabled = !t.n || !liveEvents().length;
+  document.getElementById("send").disabled = !t.n || (!liveEvents().length && !preEvents().length);
+  document.getElementById("send").textContent = isPre() ? "Vorbestellen und bezahlen" : sendLabel;
 }
 
 /* Kundendaten von früheren Bestellungen auf diesem Gerät */
@@ -796,7 +843,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   const showErr = msg => { err.textContent = msg; err.classList.add("show"); err.scrollIntoView({block:"nearest"}); };
   err.classList.remove("show");
   const t = totals();
-  const ev = liveEvents().find(x => x.id === f.event.value);
+  const ev = selEvent(), pre = isPre();
   f.querySelectorAll(".bad").forEach(x => x.classList.remove("bad"));
   if (!ev) return showErr("Gerade läuft keine Lieferung. Schau bei „Hier liefern wir“, wann wir das nächste Mal da sind.");
   if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
@@ -820,7 +867,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   if (t.maxAge === 18 && age < 18) return showErr("Spirituosen und Mischgetränke mit Spirituosen gibt es erst ab 18. Entferne sie aus dem Warenkorb, um zu bestellen.");
   if (t.maxAge === 16 && age < 16) return showErr("Alkoholische Getränke gibt es erst ab 16.");
   /* Standort automatisch prüfen, falls noch nicht geschehen */
-  if (!LOC || LOC.event !== ev.id || LOC.dist > ev.radius_m){
+  if (!pre && (!LOC || LOC.event !== ev.id || LOC.dist > ev.radius_m)){
     const send0 = document.getElementById("send"); send0.disabled = true; send0.textContent = "Standort wird geprüft …";
     const ok = await checkLoc();
     send0.disabled = false; send0.textContent = sendLabel;
@@ -839,18 +886,19 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...sbHeaders, "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
-        lat: LOC.lat, lng: LOC.lng, leergut: t.retN, zahlart: ["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar" } }) });
+        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
+        zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar") } }) });
     const j = await r.json().catch(() => null);
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel; return showErr(j.message); } else offline = true;
   }catch(x){ offline = true; }
-  send.disabled = false; send.textContent = sendLabel;
+  send.disabled = false; send.textContent = pre ? "Vorbestellen und bezahlen" : sendLabel;
   if (offline || !srv) return showErr("Deine Bestellung konnte gerade nicht gesendet werden. Bitte prüf deine Internetverbindung und tipp nochmal auf „Bestellung abschicken“.");
 
   try{
     if (f.remember.checked) localStorage.setItem("ae_kunde", JSON.stringify({ name: f.name.value.trim(), phone: f.phone.value.trim(), dob: f.dob.value, pay: f.pay.value }));
     else localStorage.removeItem("ae_kunde");
   }catch(x){}
-  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false };
+  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });

@@ -334,7 +334,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-altprod";
+const APP_VERSION = "2026-11-03-vorbestellung";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -521,6 +521,12 @@ async function zahlungFn(body){
   const r = await fetch(`${SUPA_URL}/functions/v1/zahlung`, { method:"POST", headers:{ "Content-Type":"application/json", apikey: SUPA_KEY, Authorization:`Bearer ${session ? session.access_token : SUPA_KEY}` }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Fehler bei der Zahlung"); return j;
 }
+const evOf = o => events.find(e => e.id === o.event_id);
+const vorAus = o => o.vorbestellung && (!evOf(o) || new Date(evOf(o).liefer_von) > new Date());
+function preBadge(o){
+  if (!o.vorbestellung) return "";
+  return `<span class="badge" style="background:#FFF7E0;color:var(--ink);border:1px dashed #E0A800">📅 Vorbestellung${o.wunschzeit ? ` · ab ${fmtT(o.wunschzeit)}` : ""}</span>`;
+}
 function payBadge(o){
   if (o.zahlart === "bar") return '<span class="badge" style="background:#FFF4D1;color:var(--ink)">💵 bar</span>';
   if (o.zahlart === "karte") return '<span class="badge" style="background:#E3EAFF;color:var(--ink)">💳 Karte vor Ort</span>';
@@ -536,6 +542,7 @@ const MSG = {
   weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
   gleich: (o, first) => `Hi ${first} 👋\n\n🚶 *Bin in ca. 2 Minuten bei dir!* (Bestellung #${oc(o)})\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n\n_AlkExpress_`,
   suche: (o, first) => `Hi ${first},\n\n📍 *Ich bin beim Treffpunkt, finde dich aber nicht.* (Bestellung #${oc(o)})\nWo genau bist du? Ich rufe dich gleich an.\n\n_AlkExpress_`,
+  vor: (o, first) => `Hi ${first} 👋\n\n✅ *Deine Vorbestellung #${oc(o)} ist bestätigt!*\n\n📅 *${o.event_name || "Event"}*${o.wunschzeit ? ` · Lieferung ab *${fmtT(o.wunschzeit)} Uhr*` : ""}\n💳 Bereits online bezahlt\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nWir melden uns am Abend, sobald wir zu dir unterwegs sind.\n\n_AlkExpress_`,
   beleg: (o, url) => `🧾 *Dein Beleg zu Bestellung #${oc(o)}*\n\n${url}\n\nDanke und viel Spaß! 🎉\n_AlkExpress_`,
 };
 function waBtn(o, label, text){
@@ -543,7 +550,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${payBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -558,9 +565,10 @@ function orderDetail(o){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
-    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${payBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
     ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)} ${o.zahlart === "karte" ? "· 💳 mit Karte" : o.zahlart === "bar" ? "· 💵 bar" : ""}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
+    ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
@@ -573,7 +581,7 @@ function orderDetail(o){
     <div class="sec">
       <strong style="font-size:15px">1 · Annehmen</strong>
       <div class="btns">
-        ${o.status === "eingegangen" && unbezahlt(o) ? `<span style="align-self:center">⏳ Noch nicht bezahlt – warten</span>` : o.status === "eingegangen" ? `
+        ${o.status === "eingegangen" && unbezahlt(o) ? `<span style="align-self:center">⏳ Noch nicht bezahlt – warten</span>` : o.status === "eingegangen" && vorAus(o) ? `<a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.vor(o, first))}">Vorbestellung bestätigen</a>` : o.status === "eingegangen" ? `
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
         <button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : `<span style="align-self:center">✓ Angenommen</span>`}
@@ -607,7 +615,7 @@ function orderDetail(o){
     ${!done && (isChef() || (isZust() && o.fahrer)) ? `${isChef() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
-      <div class="btns">${unbezahlt(o) ? `<span style="align-self:center">⏳ Erst nach der Online-Zahlung bestätigen.</span><a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>` : `
+      <div class="btns">${!unbezahlt(o) && vorAus(o) ? `${o.status === "eingegangen" ? `<a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.vor(o, first))}">Vorbestellung bestätigen</a><button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : `<span style="align-self:center">✓ Vorbestellung bestätigt – Lieferung am Event-Abend</span>`}<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>` : unbezahlt(o) ? `<span style="align-self:center">⏳ Erst nach der Online-Zahlung bestätigen.</span><a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>` : `
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
         ${o.status === "eingegangen" ? `<button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : ""}
