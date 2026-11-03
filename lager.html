@@ -267,6 +267,7 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
       <h2>Online-Zahlung (SumUp)</h2>
       <form id="onlForm" style="display:grid;gap:12px">
         <label class="check"><input type="checkbox" name="aktiv"> Im Shop „Jetzt online zahlen“ anbieten</label>
+        <label class="check"><input type="checkbox" name="neu"> Neukunden müssen online zahlen (bar/Karte erst ab der 2. gelieferten Bestellung)</label>
         <label>Rabatt fürs Online-Zahlen (%) <input type="number" name="rabatt" min="0" max="50" step="0.5" inputmode="decimal"></label>
         <button class="btn sm" type="submit">Speichern</button>
         <div class="note hidden" id="onlMsg" role="status"></div>
@@ -310,6 +311,9 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
     <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><input type="search" id="kuSuche" placeholder="Name oder Nummer suchen"><button type="button" class="btn o sm" id="kuCsv">CSV</button></div>
     <div class="chips" id="kuSort" style="margin-top:8px"><button class="chip on" data-s="zuletzt">Zuletzt</button><button class="chip" data-s="umsatz">Umsatz</button><button class="chip" data-s="anzahl">Bestellungen</button></div>
     <div id="kuList"></div>
+    <h2 style="margin-top:26px">Gesperrte Nummern</h2>
+    <p class="muted" style="font-size:14px;margin:0 0 8px">Mit diesen Nummern kann im Shop nicht bestellt werden. Sperren geht in jeder Bestellung („Nummer sperren“), beim Kunden oder beim Ablehnen mit „Fake/Troll-Bestellung“.</p>
+    <div id="sperrList"></div>
     <h2 style="margin-top:26px">Kunden-Feedback</h2>
     <div class="chips" id="fbFilter"><button class="chip on" data-f="neu">Neu</button><button class="chip" data-f="alle">Alle</button></div>
     <div id="fbList"></div>
@@ -335,7 +339,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-status";
+const APP_VERSION = "2026-11-03-schutz";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -578,7 +582,7 @@ function orderDetail(o){
     ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
-    ${isChef() || isLager() ? `<div class="btns" style="margin-top:6px">${waBtn(o, "Status-Link senden", MSG.status(o, first))}</div>` : ""}
+    ${isChef() || isLager() ? `<div class="btns" style="margin-top:6px">${waBtn(o, "Status-Link senden", MSG.status(o, first))}${isChef() ? `<button class="btn o sm" data-block="${o.id}">🚫 Nummer sperren</button>` : ""}</div>` : ""}
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
     <ul class="lines">${o.posten.map(p => `<li><span>${p.menge}× ${esc(p.name)}</span><span>${eur(p.menge*p.preis)}</span></li>`).join("")}
       ${Number(o.liefergebuehr) ? `<li><span>Lieferung</span><span>${eur(o.liefergebuehr)}</span></li>` : ""}
@@ -652,7 +656,7 @@ function orderDetail(o){
       <strong style="font-size:15px">Nicht geliefert?</strong>
       <div class="btns">
         <select id="xGrund" aria-label="Grund" style="flex:1;min-width:180px">
-          <option>Kein Ausweis</option><option>Zu jung</option><option>Erkennbar betrunken</option><option>Weitergabe an Minderjährige vermutet</option><option>Nicht auffindbar</option><option>Kunde storniert</option><option>Ware ausverkauft</option><option>Sonstiges</option>
+          <option>Kein Ausweis</option><option>Zu jung</option><option>Erkennbar betrunken</option><option>Weitergabe an Minderjährige vermutet</option><option>Nicht auffindbar</option><option>Kunde storniert</option><option>Fake/Troll-Bestellung</option><option>Ware ausverkauft</option><option>Sonstiges</option>
         </select>
         <button class="btn o sm" data-reject="${o.id}">Ablehnen</button>
       </div>
@@ -711,6 +715,11 @@ $("bestList").addEventListener("click", async e => {
   if (pack){ const o = orders.find(x => x.id === pack.dataset.pack);
     const { error } = await sb.rpc("bestellung_gepackt", { b_id: o.id, wert: !o.gepackt });
     if (error) toast(error.message); loadOrders(); return; }
+  const bl = e.target.closest("[data-block]");
+  if (bl){ if (bl.dataset.confirm !== "1"){ bl.dataset.confirm = "1"; bl.textContent = "Wirklich sperren?"; return; }
+    const bo = orders.find(x => x.id === bl.dataset.block);
+    const { error } = await sb.rpc("sperre_setzen", { p_tel: bo.kunde_tel, p_grund: "Manuell gesperrt", p_name: bo.kunde_name });
+    toast(error ? error.message : `${bo.kunde_tel} ist gesperrt. Mit dieser Nummer kann nicht mehr bestellt werden.`, 5000); bl.textContent = "Gesperrt"; bl.disabled = true; if (!error) loadSperre(); return; }
   const pc = e.target.closest("[data-paycheck]");
   if (pc){ pc.disabled = true; try{ const j = await zahlungFn({ aktion:"check", id: pc.dataset.paycheck }); toast(j.bezahlt ? "Bezahlt ✅" : "Noch keine Zahlung eingegangen."); }catch(x){ toast(x.message); } loadOrders(); return; }
   const rf = e.target.closest("[data-refund]");
@@ -738,6 +747,8 @@ $("bestList").addEventListener("click", async e => {
     const grund = $("xGrund").value;
     const { error } = await sb.rpc("bestellung_status", { b_id: rej.dataset.reject, neu: grund === "Kunde storniert" ? "storniert" : "abgelehnt", grund });
     if (error) return note($("xMsg"), error.message);
+    if (grund === "Fake/Troll-Bestellung"){ const ro = orders.find(x => x.id === rej.dataset.reject);
+      if (ro){ await sb.rpc("sperre_setzen", { p_tel: ro.kunde_tel, p_grund: "Fake/Troll", p_name: ro.kunde_name }); toast("Abgelehnt und Nummer gesperrt."); loadOrders(); loadSperre(); return; } }
     toast("Abgelehnt und protokolliert. Kein Bestand abgebucht."); loadOrders();
   }
 });
@@ -846,13 +857,14 @@ function renderKunden(){
     const wa = normTel(k.tel);
     return `<div class="card" style="padding:14px 16px;cursor:pointer" data-ku="${esc(k.key)}" role="button" tabindex="0" aria-expanded="${open}">
       <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
-        <div><strong>${esc(k.name||"–")}</strong>${k.n >= 3 ? ` <span class="badge" style="background:var(--y);color:var(--ink)">Stammkunde</span>` : ""}
+        <div><strong>${esc(k.name||"–")}</strong>${SPERRE.some(x => x.tel === normTel(k.tel)) ? ` <span class="badge" style="background:#FFE3E0;color:#A1271D">gesperrt</span>` : ""}${k.n >= 3 ? ` <span class="badge" style="background:var(--y);color:var(--ink)">Stammkunde</span>` : ""}
           <div class="muted" style="font-size:14px">${esc(k.tel||"")} · zuletzt ${new Date(k.last).toLocaleDateString("de-AT")}</div>
           <div style="font-size:14px;margin-top:4px">${k.n} ${k.n === 1 ? "Lieferung" : "Lieferungen"} · <strong>${eur(k.umsatz)}</strong>${top.length ? ` · meist ${esc(top[0][0])}` : ""}</div></div>
         <span style="font-size:20px;color:var(--muted);line-height:1">${open ? "–" : "+"}</span>
       </div>
       ${open ? `<div class="sec">
-        <div class="btns"><a class="btn sm" href="tel:${esc(k.tel)}">📞 Anrufen</a>${wa ? `<a class="btn o sm" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</div>
+        <div class="btns"><a class="btn sm" href="tel:${esc(k.tel)}">📞 Anrufen</a>${wa ? `<a class="btn o sm" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}
+          ${SPERRE.some(x => x.tel === wa) ? `<button class="btn o sm" data-kuunblock="${esc(wa)}">Entsperren</button>` : `<button class="btn o sm" data-kublock="${esc(k.key)}">🚫 Sperren</button>`}</div>
         <p style="margin:0;font-size:14px">Kunde seit ${new Date(k.first).toLocaleDateString("de-AT")} · ${k.orders.length} Bestellungen insgesamt · Ø ${eur(k.n ? k.umsatz/k.n : 0)} pro Lieferung</p>
         ${top.length ? `<p style="margin:4px 0 0;font-weight:700;font-size:14px">Was er/sie bestellt</p>
         <ul class="lines" style="margin:0">${top.map(([n,c]) => `<li><span>${esc(n)}</span><span>${c}×</span></li>`).join("")}</ul>` : ""}
@@ -866,9 +878,15 @@ function renderKunden(){
 $("kuSuche").addEventListener("input", () => { kuLimit = 30; renderKunden(); });
 $("kuSort").onclick = e => { const b = e.target.closest("[data-s]"); if (!b) return; kuSort = b.dataset.s;
   document.querySelectorAll("#kuSort .chip").forEach(c => c.classList.toggle("on", c === b)); renderKunden(); };
-$("kuList").addEventListener("click", e => {
+$("kuList").addEventListener("click", async e => {
   if (e.target.closest("#kuMore")){ kuLimit += 30; renderKunden(); return; }
   if (e.target.closest("a")) return;
+  const kb = e.target.closest("[data-kublock]");
+  if (kb){ if (kb.dataset.confirm !== "1"){ kb.dataset.confirm = "1"; kb.textContent = "Wirklich sperren?"; return; }
+    const k = KUNDEN.find(x => x.key === kb.dataset.kublock); const { error } = await sb.rpc("sperre_setzen", { p_tel: k.tel, p_grund: "Manuell gesperrt", p_name: k.name });
+    if (error) return toast(error.message); toast("Gesperrt."); loadSperre(); return; }
+  const ku = e.target.closest("[data-kuunblock]");
+  if (ku){ const { error } = await sb.rpc("sperre_aufheben", { p_tel: ku.dataset.kuunblock }); if (error) return toast(error.message); toast("Entsperrt."); loadSperre(); return; }
   const c = e.target.closest("[data-ku]"); if (!c) return;
   kuOpen = kuOpen === c.dataset.ku ? null : c.dataset.ku; renderKunden();
 });
@@ -876,9 +894,21 @@ $("kuCsv").onclick = () => csv("kunden", ["Name","Telefon","Lieferungen","Umsatz
   KUNDEN.map(k => [k.name, k.tel, k.n, Math.round(k.umsatz*100)/100, new Date(k.first).toLocaleDateString("de-AT"), new Date(k.last).toLocaleDateString("de-AT"),
     Object.entries(k.prod).sort((a,b) => b[1]-a[1]).map(([n,c]) => `${c}× ${n}`).join(", ")]));
 
+let SPERRE = [];
+async function loadSperre(){
+  if (!isChef()) return;
+  const { data } = await sb.rpc("sperrliste_lesen"); SPERRE = Array.isArray(data) ? data : []; renderSperre(); if (KU_RAW) renderKunden();
+}
+function renderSperre(){
+  $("sperrList").innerHTML = SPERRE.length ? SPERRE.map(x => `<div class="card" style="padding:12px 16px;display:flex;justify-content:space-between;gap:10px;align-items:center">
+    <div><strong>+${esc(x.tel)}</strong>${x.name ? ` · ${esc(x.name)}` : ""}<div class="muted" style="font-size:13px">${esc(x.grund || "")} · ${fmtDT(x.am)}${x.von ? ` · ${esc(x.von)}` : ""}</div></div>
+    <button class="btn o sm" data-unblock="${esc(x.tel)}">Entsperren</button></div>`).join("") : `<p class="muted">Keine gesperrten Nummern.</p>`;
+}
+$("sperrList").addEventListener("click", async e => { const b = e.target.closest("[data-unblock]"); if (!b) return;
+  const { error } = await sb.rpc("sperre_aufheben", { p_tel: b.dataset.unblock }); if (error) return toast(error.message); toast("Entsperrt."); loadSperre(); });
 async function loadTeam(){
   if (!isChef()) return;
-  loadFeedback(); loadKunden();
+  loadFeedback(); loadKunden(); loadSperre();
   const { data } = await sb.from("admins").select("*").order("rolle").order("name");
   TEAM = data || []; renderTeam();
 }
@@ -1312,10 +1342,10 @@ async function loadSettings(){
   const { data } = await sb.from("einstellungen").select("*").eq("id", 1).single();
   SET = data; if (!data) return;
   const f = $("setForm"); for (const k of ["firma","inhaber","adresse","uid","liefergebuehr"]) f[k].value = data[k] ?? ""; f.kleinunternehmer.checked = data.kleinunternehmer;
-  $("onlForm").aktiv.checked = !!data.online_aktiv; $("onlForm").rabatt.value = data.online_rabatt ?? 10;
+  $("onlForm").aktiv.checked = !!data.online_aktiv; $("onlForm").neu.checked = !!data.neukunden_online; $("onlForm").rabatt.value = data.online_rabatt ?? 10;
 }
 $("onlForm").addEventListener("submit", async e => {
-  e.preventDefault(); const f = e.target, row = { online_aktiv: f.aktiv.checked, online_rabatt: Math.min(50, Math.max(0, Number(f.rabatt.value)||0)) };
+  e.preventDefault(); const f = e.target, row = { online_aktiv: f.aktiv.checked, neukunden_online: f.neu.checked && f.aktiv.checked, online_rabatt: Math.min(50, Math.max(0, Number(f.rabatt.value)||0)) };
   const { error } = await sb.from("einstellungen").update(row).eq("id", 1);
   if (error) return note($("onlMsg"), error.message);
   await sb.from("protokoll").insert({ wer: ME, aktion: "online_zahlung_geaendert", details: row });

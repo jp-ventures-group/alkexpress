@@ -376,6 +376,7 @@ dialog p{margin:0 0 18px}
       <label class="check"><input type="checkbox" name="id" required><span><b class="req">*</b> Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
       <label class="check"><input type="checkbox" name="remember" checked><span>Meine Daten auf diesem Handy merken, damit ich beim nächsten Mal nicht alles neu eintippen muss.</span></label>
       <label class="check"><input type="checkbox" name="agb" required><span><b class="req">*</b> Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
+      <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <div class="err" id="err" role="alert"></div>
       <button class="send" id="send" type="submit">Bestellung abschicken</button>
     </form>
@@ -398,7 +399,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-preflow";
+const SITE_VERSION = "2026-11-03-schutz";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -897,10 +898,13 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...sbHeaders, "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
-        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
+        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
         zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar") } }) });
     const j = await r.json().catch(() => null);
-    if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel; return showErr(j.message); } else offline = true;
+    if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel;
+      if (j.message.startsWith("NEUKUNDE:")){ const pay = f.pay; if (pay.querySelector('option[value="online"]')){ pay.value = "online"; render(); }
+        return showErr(j.message.replace("NEUKUNDE:", "").trim() + (pay.value === "online" ? " Wir haben „Online zahlen“ schon für dich ausgewählt, tipp einfach nochmal auf Abschicken." : "")); }
+      return showErr(j.message); } else offline = true;
   }catch(x){ offline = true; }
   send.disabled = false; send.textContent = pre ? "Vorbestellen und bezahlen" : sendLabel;
   if (offline || !srv) return showErr("Deine Bestellung konnte gerade nicht gesendet werden. Bitte prüf deine Internetverbindung und tipp nochmal auf „Bestellung abschicken“.");
