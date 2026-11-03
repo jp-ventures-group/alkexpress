@@ -400,7 +400,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-prenote";
+const SITE_VERSION = "2026-11-03-preflow2";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -654,11 +654,11 @@ document.getElementById("eventList").addEventListener("click", e => {
   const b = e.target.closest("[data-pre]"); if (!b) return;
   document.querySelector("[name=event]").value = b.dataset.pre; applyMode(); render();
   const ev = EVENTS.find(x => x.id === b.dataset.pre);
-  if (Object.keys(cart).length){ openCart(); setTimeout(() => document.querySelector("[name=event]").scrollIntoView({ block:"center", behavior:"smooth" }), 300); return; }
-  /* Warenkorb leer: erst zum Sortiment, Event ist schon ausgewählt */
-  const n = document.getElementById("preNote");
-  n.innerHTML = `<span>📅 <b>Vorbestellung für ${esc(ev ? ev.name : "dein Event")}</b>${ev ? ` (${fmtDay(new Date(ev.liefer_von))})` : ""}. Wähl deine Drinks, dann unten auf den Warenkorb tippen.</span><button type="button" aria-label="Hinweis schließen">×</button>`;
+  /* Immer zuerst zum Sortiment, Event ist schon ausgewählt */
+  const n = document.getElementById("preNote"), voll = Object.keys(cart).length;
+  n.innerHTML = `<span>📅 <b>Vorbestellung für ${esc(ev ? ev.name : "dein Event")}</b>${ev ? ` (${fmtDay(new Date(ev.liefer_von))})` : ""}. ${voll ? "Ergänze deine Drinks oder geh direkt zum Warenkorb." : "Wähl deine Drinks, dann unten auf den Warenkorb tippen."}${voll ? ` <a href="#" id="preCart" style="color:inherit;font-weight:700">Zum Warenkorb →</a>` : ""}</span><button type="button" aria-label="Hinweis schließen">×</button>`;
   n.hidden = false; n.querySelector("button").onclick = () => { n.hidden = true; };
+  const pc = document.getElementById("preCart"); if (pc) pc.onclick = ev2 => { ev2.preventDefault(); openCart(); };
   document.getElementById("sortiment").scrollIntoView({ behavior:"smooth", block:"start" });
 });
 
