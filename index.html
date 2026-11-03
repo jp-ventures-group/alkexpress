@@ -202,6 +202,7 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px;min-width:0}
 .req{color:var(--band18);font-weight:800;margin-left:2px} .opt{font-weight:500;color:#6B6799;font-size:14px}
 .reqnote{margin:0 0 4px;font-size:13px;color:#6B6799}
 .prebox{display:grid;gap:8px;background:#FFF7E0;border:1.5px dashed #FFC83D;border-radius:var(--r-sm);padding:12px}
+.prenote[hidden]{display:none!important}
 .prenote{position:sticky;top:112px;z-index:5;background:#FFF7E0;color:#1E1B4B;border:1.5px dashed #E0A800;border-radius:14px;padding:12px 14px;margin:0 0 14px;font-size:15px;line-height:1.4;display:flex;gap:10px;align-items:center;justify-content:space-between}
 .prenote button{flex:none;border:0;background:none;font-size:20px;cursor:pointer;color:#1E1B4B}
 .prebox small{color:#5A5690;font-size:13px;line-height:1.4}
@@ -275,7 +276,7 @@ dialog p{margin:0 0 18px}
       <ol class="steps">
         <li><span class="k">1</span><h3>Bestellen</h3><p>Während eines Events Getränke auswählen, Standort bestätigen und Treffpunkt angeben.</p></li>
         <li><span class="k">2</span><h3>Bestätigung</h3><p>Wir melden uns per WhatsApp mit der Lieferzeit, meist 10–20 Minuten.</p></li>
-        <li><span class="k">3</span><h3>Übergabe mit Ausweis</h3><p>Wir prüfen deinen Ausweis und übergeben nur an die Person, die bestellt hat. Bezahlt wird bar oder mit Karte.</p></li>
+        <li><span class="k">3</span><h3>Übergabe mit Ausweis</h3><p>Wir prüfen deinen Ausweis und übergeben nur an die Person, die bestellt hat. Bezahlt wird bar, mit Karte oder vorab online.</p></li>
       </ol>
     </div>
   </section>
@@ -399,7 +400,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-liefergeb";
+const SITE_VERSION = "2026-11-03-prenote";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
