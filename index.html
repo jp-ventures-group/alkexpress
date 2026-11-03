@@ -395,7 +395,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-prebtn";
+const SITE_VERSION = "2026-11-03-status";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -747,6 +747,7 @@ function render(){
         <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>${LAST_ORDER.online ? ", <b>online bezahlt</b> ✅ – bei der Übergabe zahlst du nichts mehr." : ", bar oder Karte bei der Übergabe."}</p>`}
         ${LAST_ORDER.pre ? "" : `<p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er ${LAST_ORDER.meet ? `bei „${esc(LAST_ORDER.meet)}“` : "da"} ist.</p>`}
         ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
+        ${LAST_ORDER.token ? `<a class="btn1" style="display:inline-block;margin-top:12px;text-decoration:none" href="status.html?id=${encodeURIComponent(LAST_ORDER.id)}&t=${encodeURIComponent(LAST_ORDER.token)}">Bestellstatus live ansehen</a><p class="q" style="margin:6px 0 0;font-size:13px">Tipp: Seite als Lesezeichen speichern.</p>` : ""}
       </div>`
       : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
@@ -899,7 +900,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     if (f.remember.checked) localStorage.setItem("ae_kunde", JSON.stringify({ name: f.name.value.trim(), phone: f.phone.value.trim(), dob: f.dob.value, pay: f.pay.value }));
     else localStorage.removeItem("ae_kunde");
   }catch(x){}
-  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "" };
+  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });

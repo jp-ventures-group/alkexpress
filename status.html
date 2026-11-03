@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#1E1B4B">
+<title>AlkExpress Bestellstatus</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,700..800&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#1E1B4B;--ink2:#2A2766;--paper:#F6F4FF;--muted:#B9B5E6;--y:#FFC83D;--r:#FF5B4F;--go:#4FD6A8;--line:rgba(246,244,255,.14)}
+*{box-sizing:border-box}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--ink);color:var(--paper);font-family:"DM Sans",system-ui,sans-serif;font-size:16px;line-height:1.45}
+main{max-width:480px;margin:0 auto;padding:20px 16px 40px}
+.logo{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-stretch:80%;font-size:26px;text-decoration:none;color:inherit}
+.logo b{color:var(--r)}
+h1{font-family:"Bricolage Grotesque",sans-serif;font-weight:800;font-stretch:78%;font-size:40px;line-height:.95;margin:22px 0 6px}
+.sub{color:var(--muted);margin:0}
+.steps{list-style:none;padding:0;margin:22px 0 0;display:grid;gap:0}
+.steps li{display:grid;grid-template-columns:34px 1fr;gap:12px;align-items:start;position:relative;padding-bottom:18px}
+.steps li:not(:last-child)::after{content:"";position:absolute;left:16px;top:32px;bottom:2px;width:2px;background:var(--line)}
+.steps li.done:not(:last-child)::after{background:var(--go)}
+.dot{width:34px;height:34px;border-radius:50%;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;color:var(--muted);background:var(--ink)}
+.done .dot{background:var(--go);border-color:var(--go);color:var(--ink)}
+.now .dot{border-color:var(--y);color:var(--y);box-shadow:0 0 0 4px rgba(255,200,61,.18)}
+.st b{display:block;font-size:17px}
+.st span{color:var(--muted);font-size:14px}
+.todo .st b{color:var(--muted);font-weight:500}
+.card{background:var(--paper);color:var(--ink);border-radius:18px;padding:16px 18px;margin-top:18px}
+.card h2{font-family:"Bricolage Grotesque",sans-serif;font-size:20px;margin:0 0 8px}
+.lines{list-style:none;padding:0;margin:0}
+.lines li{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px dashed #D8D5EE}
+.lines li:last-child{border-bottom:0}
+.tot{display:flex;justify-content:space-between;font-weight:800;font-size:18px;border-top:2px solid var(--ink);margin-top:6px;padding-top:8px}
+.note{border-radius:14px;padding:12px 14px;margin-top:16px;font-weight:600}
+.note.y{background:#FFF4D1;color:var(--ink)} .note.r{background:#FFE3E0;color:#8E1F17} .note.g{background:#DDF7EE;color:var(--ink)}
+.btn{display:inline-block;border:0;border-radius:999px;padding:12px 18px;font-weight:700;font-size:15px;text-decoration:none;cursor:pointer;margin:10px 8px 0 0}
+.btn.y{background:var(--y);color:var(--ink)} .btn.o{background:none;color:var(--paper);border:1.5px solid var(--paper)} .btn.wa{background:#25D366;color:#073B1D}
+.muted{color:var(--muted);font-size:14px}
+.upd{color:var(--muted);font-size:13px;margin-top:20px}
+</style>
+</head>
+<body>
+<main>
+  <a class="logo" href="/">Alk<b>Express</b></a>
+  <div id="out"><p class="sub" style="margin-top:24px">Status wird geladen …</p></div>
+</main>
+<script>
+const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
+const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
+const WA = "436704009548";
+const H = { apikey: SUPA_KEY, Authorization: `Bearer ${SUPA_KEY}`, "Content-Type": "application/json" };
+const eur = n => Number(n||0).toLocaleString("de-AT",{style:"currency",currency:"EUR"});
+const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fT = d => new Date(d).toLocaleTimeString("de-AT",{hour:"2-digit",minute:"2-digit"});
+const fD = d => new Date(d).toLocaleDateString("de-AT",{weekday:"short",day:"2-digit",month:"2-digit"});
+const q = new URLSearchParams(location.search), ID = q.get("id"), T = q.get("t");
+const out = document.getElementById("out");
+let timer = null;
+
+async function load(){
+  try{
+    const r = await fetch(`${SUPA_URL}/rest/v1/rpc/bestellung_info`, { method:"POST", headers:H, body: JSON.stringify({ b_id: ID, tok: T }), cache:"no-store" });
+    const b = await r.json();
+    if (!r.ok || !b) throw new Error("nf");
+    render(b);
+    const fertig = ["geliefert","abgelehnt","storniert"].includes(b.status);
+    clearTimeout(timer); if (!fertig) timer = setTimeout(load, 15000);
+  }catch(e){
+    out.innerHTML = `<h1>Bestellung nicht gefunden</h1><p class="sub">Der Link ist unvollständig oder abgelaufen. Schreib uns auf WhatsApp, wir helfen dir weiter.</p><a class="btn wa" href="https://wa.me/${WA}">WhatsApp</a>`;
+  }
+}
+
+function render(b){
+  const onl = b.zahlart === "online", offen = onl && !b.bezahlt;
+  const steps = [["eingegangen", b.vorbestellung ? "Vorbestellung eingegangen" : "Bestellung eingegangen", fT(b.created_at) + " Uhr"]];
+  if (onl) steps.push(["bezahlt", "Online bezahlt", b.bezahlt ? "Danke!" : "Wartet auf Zahlung"]);
+  steps.push(["bestaetigt", "Bestätigt", b.vorbestellung ? "Wir liefern am Event-Abend" : "Wir packen deine Drinks"]);
+  steps.push(["unterwegs", "Unterwegs zu dir", "Der Zusteller ruft dich an"]);
+  steps.push(["geliefert", "Geliefert", "Viel Spaß!"]);
+  const storno = ["abgelehnt","storniert"].includes(b.status);
+  const items = (b.posten || []).map(p => `<li><span>${p.menge}× ${esc(String(p.name).split(" · ")[0])}</span></li>`).join("");
+  const head = storno ? "Bestellung storniert" : b.status === "geliefert" ? "Geliefert. Prost!" : offen ? "Zahlung offen" : b.status === "unterwegs" ? "Wir sind unterwegs" : b.vorbestellung && b.status === "bestaetigt" ? "Vorbestellung bestätigt" : b.status === "bestaetigt" ? "Bestätigt" : "Eingegangen";
+  out.innerHTML = `
+    <h1>${head}</h1>
+    <p class="sub">Bestellung <b>#${esc(b.code)}</b> · ${esc(b.event || "")}</p>
+    ${b.vorbestellung ? `<div class="note y">📅 Vorbestellung für ${esc(b.event||"")}${b.liefer_von ? ` am ${fD(b.liefer_von)}` : ""}${b.wunschzeit ? ` · Lieferung ab <b>${fT(b.wunschzeit)} Uhr</b>` : " · so früh wie möglich"}${b.ort ? `, ${esc(b.ort)}` : ""}</div>` : ""}
+    ${storno ? `<div class="note r">Diese Bestellung wurde ${b.status === "abgelehnt" ? "abgelehnt" : "storniert"}${b.grund ? `: ${esc(b.grund)}` : "."}${onl && b.bezahlt ? (b.erstattet ? "<br>Das Geld wurde zurückerstattet, es ist in ein paar Tagen auf deinem Konto." : "<br>Dein Geld bekommst du zurück.") : ""}</div>` : `
+    <ol class="steps">${(() => { const ST = ["bestaetigt","unterwegs","geliefert"];
+      const isDone = k => k === "eingegangen" || (k === "bezahlt" && b.bezahlt) || (k === "bestaetigt" && ST.includes(b.status)) || (k === "unterwegs" && ST.slice(1).includes(b.status)) || (k === "geliefert" && b.status === "geliefert");
+      const first = steps.findIndex(([k]) => !isDone(k));
+      return steps.map(([k,t,s2], i) => { const cls = isDone(k) ? "done" : i === first ? "now" : "todo";
+        return `<li class="${cls}"><div class="dot">${cls === "done" ? "✓" : ""}</div><div class="st"><b>${t}</b><span>${s2}</span></div></li>`; }).join(""); })()}</ol>`}
+    ${offen && !storno ? `<div class="note y">Deine Bestellung geht erst los, wenn sie bezahlt ist.</div><button class="btn y" id="pay">Jetzt bezahlen</button>` : ""}
+    ${!storno && b.status !== "geliefert" && b.max_alter ? `<div class="note g">🪪 Bitte halte deinen Ausweis bereit (ab ${b.max_alter}).</div>` : ""}
+    <div class="card"><h2>Deine Bestellung</h2><ul class="lines">${items}</ul>
+      <div class="tot"><span>Gesamt</span><span>${eur(b.gesamt)}</span></div>
+      <p class="muted" style="color:#5A5690;margin:6px 0 0">${onl ? (b.bezahlt ? "Online bezahlt" : "Online zahlen") : b.zahlart === "karte" ? "Karte bei der Übergabe" : "Bar bei der Übergabe"}${b.treffpunkt ? ` · Treffpunkt: ${esc(b.treffpunkt)}` : ""}</p></div>
+    ${b.status === "geliefert" ? `<a class="btn y" href="beleg.html?id=${encodeURIComponent(ID)}&t=${encodeURIComponent(T)}">Beleg ansehen</a>` : ""}
+    <a class="btn wa" href="https://wa.me/${WA}?text=${encodeURIComponent(`Hi, Frage zu meiner Bestellung #${b.code}`)}">Frage? WhatsApp</a>
+    <p class="upd">${["geliefert","abgelehnt","storniert"].includes(b.status) ? "" : "Aktualisiert sich automatisch. "}Stand ${fT(new Date())} Uhr</p>`;
+  const pay = document.getElementById("pay");
+  if (pay) pay.onclick = async () => {
+    pay.disabled = true; pay.textContent = "Bezahlseite wird geöffnet …";
+    try{
+      const r = await fetch(`${SUPA_URL}/functions/v1/zahlung`, { method:"POST", headers:H, body: JSON.stringify({ aktion:"start", id: ID, zurueck: location.origin + location.pathname + `?id=${ID}&t=${T}` }) });
+      const j = await r.json(); if (!r.ok) throw new Error(j.error || "Fehler");
+      if (j.url) location.href = j.url; else load();
+    }catch(e){ pay.disabled = false; pay.textContent = "Jetzt bezahlen"; alert(e.message); }
+  };
+}
+
+(async () => {
+  if (!ID || !T){ out.innerHTML = `<h1>Link unvollständig</h1><p class="sub">Bitte öffne den Link aus deiner Bestellbestätigung.</p>`; return; }
+  if (q.get("bezahlt")){
+    try{ await fetch(`${SUPA_URL}/functions/v1/zahlung`, { method:"POST", headers:H, body: JSON.stringify({ aktion:"check", id: ID }) }); }catch(e){}
+    history.replaceState(null, "", location.pathname + `?id=${ID}&t=${T}`);
+  }
+  load();
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
+})();
+</script>
+</body>
+</html>

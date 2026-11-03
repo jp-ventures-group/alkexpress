@@ -335,7 +335,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-vorbest3";
+const APP_VERSION = "2026-11-03-status";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -541,13 +541,15 @@ function payBadge(o){
 }
 const istTest = o => { const e = events.find(x => x.id === o.event_id); return !!(e && e.test) || Number(o.beleg_nr) < 0; };
 const belegNr = n => Number(n) < 0 ? `Ü-${-Number(n)} (Übung)` : n;
+const statusUrl = o => new URL(`status.html?id=${o.id}&t=${o.token}`, location.href).href;
 const MSG = {
-  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n${onl(o) ? `💳 *Bereits online bezahlt* – du zahlst nichts mehr\n` : `💶 Betrag: *${eur(o.gesamt)}* (${o.zahlart === "karte" ? "mit Karte" : o.zahlart === "bar" ? "bar" : "bar oder Karte"})\n`}${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
+  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n${onl(o) ? `💳 *Bereits online bezahlt* – du zahlst nichts mehr\n` : `💶 Betrag: *${eur(o.gesamt)}* (${o.zahlart === "karte" ? "mit Karte" : o.zahlart === "bar" ? "bar" : "bar oder Karte"})\n`}${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n📲 Live-Status: ${statusUrl(o)}\n\n_AlkExpress_`,
   da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
   weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
   gleich: (o, first) => `Hi ${first} 👋\n\n🚶 *Bin in ca. 2 Minuten bei dir!* (Bestellung #${oc(o)})\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n\n_AlkExpress_`,
   suche: (o, first) => `Hi ${first},\n\n📍 *Ich bin beim Treffpunkt, finde dich aber nicht.* (Bestellung #${oc(o)})\nWo genau bist du? Ich rufe dich gleich an.\n\n_AlkExpress_`,
-  vor: (o, first) => `Hi ${first} 👋\n\n✅ *Deine Vorbestellung #${oc(o)} ist bestätigt!*\n\n📅 *${o.event_name || "Event"}*${o.wunschzeit ? ` · Lieferung ab *${fmtT(o.wunschzeit)} Uhr*` : ""}\n💳 Bereits online bezahlt\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nWir melden uns am Abend, sobald wir zu dir unterwegs sind.\n\n_AlkExpress_`,
+  vor: (o, first) => `Hi ${first} 👋\n\n✅ *Deine Vorbestellung #${oc(o)} ist bestätigt!*\n\n📅 *${o.event_name || "Event"}*${o.wunschzeit ? ` · Lieferung ab *${fmtT(o.wunschzeit)} Uhr*` : ""}\n💳 Bereits online bezahlt\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nWir melden uns am Abend, sobald wir zu dir unterwegs sind.\n\n📲 Live-Status: ${statusUrl(o)}\n\n_AlkExpress_`,
+  status: (o, first) => `Hi ${first} 👋\n\nHier kannst du deine Bestellung *#${oc(o)}* live verfolgen:\n${statusUrl(o)}\n\n_AlkExpress_`,
   beleg: (o, url) => `🧾 *Dein Beleg zu Bestellung #${oc(o)}*\n\n${url}\n\nDanke und viel Spaß! 🎉\n_AlkExpress_`,
 };
 function waBtn(o, label, text){
@@ -576,6 +578,7 @@ function orderDetail(o){
     ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
+    ${isChef() || isLager() ? `<div class="btns" style="margin-top:6px">${waBtn(o, "Status-Link senden", MSG.status(o, first))}</div>` : ""}
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
     <ul class="lines">${o.posten.map(p => `<li><span>${p.menge}× ${esc(p.name)}</span><span>${eur(p.menge*p.preis)}</span></li>`).join("")}
       ${Number(o.liefergebuehr) ? `<li><span>Lieferung</span><span>${eur(o.liefergebuehr)}</span></li>` : ""}
