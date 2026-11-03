@@ -199,6 +199,10 @@ footer button,footer nav a{background:none;border:0;padding:0;text-decoration:un
 .empty{padding:30px 0;color:#5A5690}
 form{display:grid;gap:14px}
 label{display:grid;gap:6px;font-weight:700;font-size:15px;min-width:0}
+.req{color:var(--band18);font-weight:800;margin-left:2px} .opt{font-weight:500;color:#6B6799;font-size:14px}
+.reqnote{margin:0 0 4px;font-size:13px;color:#6B6799}
+.bad input:not([type=checkbox]),.bad textarea,.bad select{border-color:var(--band18)!important;background:#FFF1F0}
+.check.bad span,.loc.bad strong{color:var(--band18)}
 .d-body form{min-width:0} .d-body select,.d-body input,.d-body textarea{max-width:100%;min-width:0;box-sizing:border-box} .d-body select{width:100%;text-overflow:ellipsis}
 html,body{overflow-x:clip}
 label small{font-weight:400;color:#5A5690}
@@ -342,24 +346,25 @@ dialog p{margin:0 0 18px}
     <div id="cartView"></div>
     <form id="orderForm" novalidate>
       <div class="saved" id="savedBox" hidden><span id="savedTxt"></span><button type="button" id="forget">Nicht du?</button></div>
-      <label>Name <input name="name" autocomplete="name" required></label>
-      <label>Handynummer <small>für WhatsApp-Rückmeldung</small><input name="phone" type="tel" autocomplete="tel" required></label>
-      <label>Event <select name="event" required></select></label>
+      <p class="reqnote"><b class="req">*</b> Pflichtfeld</p>
+      <label><span>Name <b class="req" aria-hidden="true">*</b></span><input name="name" autocomplete="name" required></label>
+      <label><span>Handynummer <b class="req" aria-hidden="true">*</b></span><small>für WhatsApp-Rückmeldung und damit dich der Fahrer anrufen kann</small><input name="phone" type="tel" autocomplete="tel" required></label>
+      <label><span>Event <b class="req" aria-hidden="true">*</b></span><select name="event" required></select></label>
       <div class="loc">
-        <strong style="font-size:15px">Standort bestätigen</strong>
-        <small style="color:#5A5690">Wir liefern nur im Umkreis der Location. Dein Standort wird nur für diese Bestellung verwendet.</small>
+        <strong style="font-size:15px">Standort <b class="req" aria-hidden="true">*</b></strong>
+        <small style="color:#5A5690">Wir liefern nur im Umkreis der Location. Wird beim Abschicken automatisch geprüft, dein Handy fragt dann nach Erlaubnis. Dein Standort wird nur für diese Bestellung verwendet.</small>
         <button type="button" id="locBtn">Meinen Standort prüfen</button>
         <div class="res" id="locRes" aria-live="polite"></div>
       </div>
-      <label>Treffpunkt <small>So finden wir dich schnell</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke" required></textarea></label>
-      <label>Geburtsdatum <input name="dob" type="text" inputmode="numeric" autocomplete="bday" placeholder="TT.MM.JJJJ" maxlength="10" required></label>
-      <label>Leergut zur Rückgabe <small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
-      <label>Zahlung
+      <label><span>Treffpunkt <span class="opt">(optional)</span></span><small>Hilft uns, dich schneller zu finden. Sonst ruft dich der Fahrer an.</small><textarea name="meet" placeholder="z. B. Haupteingang links, schwarze Jacke"></textarea></label>
+      <label><span>Geburtsdatum <b class="req" aria-hidden="true">*</b></span><input name="dob" type="text" inputmode="numeric" autocomplete="bday" placeholder="TT.MM.JJJJ" maxlength="10" required></label>
+      <label><span>Leergut zur Rückgabe <span class="opt">(optional)</span></span><small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
+      <label><span>Zahlung <b class="req" aria-hidden="true">*</b></span>
         <select name="pay"><option value="bar">Bar bei Übergabe</option><option value="karte">Karte bei Übergabe</option></select>
       </label>
-      <label class="check"><input type="checkbox" name="id" required><span>Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
+      <label class="check"><input type="checkbox" name="id" required><span><b class="req">*</b> Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
       <label class="check"><input type="checkbox" name="remember" checked><span>Meine Daten auf diesem Handy merken, damit ich beim nächsten Mal nicht alles neu eintippen muss.</span></label>
-      <label class="check"><input type="checkbox" name="agb" required><span>Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
+      <label class="check"><input type="checkbox" name="agb" required><span><b class="req">*</b> Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
       <div class="err" id="err" role="alert"></div>
       <button class="send" id="send" type="submit">Bestellung abschicken</button>
     </form>
@@ -382,7 +387,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-scroll2";
+const SITE_VERSION = "2026-11-03-felder";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -571,25 +576,32 @@ function renderEvents(){
   if (LOC && LOC.event !== sel.value) { LOC = null; document.getElementById("locRes").textContent = ""; }
   render();
 }
-document.getElementById("locBtn").addEventListener("click", () => {
-  const res = document.getElementById("locRes"), sel = document.querySelector("[name=event]");
-  const ev = liveEvents().find(x => x.id === sel.value);
-  if (!ev){ res.className = "res bad"; res.textContent = "Gerade läuft keine Lieferung."; return; }
-  if (!navigator.geolocation){ res.className = "res bad"; res.textContent = "Dein Browser kann den Standort nicht teilen."; return; }
-  res.className = "res"; res.textContent = "Standort wird ermittelt …";
-  navigator.geolocation.getCurrentPosition(p => {
-    const { latitude:lat, longitude:lng, accuracy:acc } = p.coords;
-    const dist = distM(lat, lng, ev.lat, ev.lng);
-    LOC = { event: ev.id, lat, lng, acc, dist };
-    const ok = dist <= ev.radius_m;
-    res.className = "res " + (ok ? "ok" : "bad");
-    res.textContent = ok ? `Passt: Du bist ca. ${Math.round(dist)} m von ${ev.ort} entfernt.`
-                         : `Du bist ca. ${Math.round(dist)} m entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m um ${ev.ort}.`;
-  }, err => {
-    LOC = null; res.className = "res bad";
-    res.textContent = err.code === 1 ? "Standortzugriff abgelehnt. Erlaube ihn in den Browsereinstellungen und versuch es erneut." : "Standort konnte nicht ermittelt werden. Versuch es draußen nochmal.";
-  }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
-});
+/* Standort prüfen: per Knopf oder automatisch beim Abschicken. Liefert true, wenn im Umkreis. */
+function checkLoc(){
+  return new Promise(resolve => {
+    const res = document.getElementById("locRes"), sel = document.querySelector("[name=event]");
+    const ev = liveEvents().find(x => x.id === sel.value);
+    const fail = t => { res.className = "res bad"; res.textContent = t; resolve(false); };
+    if (!ev) return fail("Gerade läuft keine Lieferung.");
+    if (!navigator.geolocation) return fail("Dein Browser kann den Standort nicht teilen.");
+    res.className = "res"; res.textContent = "Standort wird ermittelt …";
+    navigator.geolocation.getCurrentPosition(p => {
+      const { latitude:lat, longitude:lng, accuracy:acc } = p.coords;
+      const dist = distM(lat, lng, ev.lat, ev.lng);
+      LOC = { event: ev.id, lat, lng, acc, dist };
+      const ok = dist <= ev.radius_m;
+      res.className = "res " + (ok ? "ok" : "bad");
+      res.textContent = ok ? `Passt: Du bist ca. ${Math.round(dist)} m von ${ev.ort} entfernt.`
+                           : `Du bist ca. ${Math.round(dist)} m entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m um ${ev.ort}.`;
+      document.querySelector(".loc").classList.toggle("bad", !ok);
+      resolve(ok);
+    }, err => {
+      LOC = null;
+      fail(err.code === 1 ? "Standortzugriff abgelehnt. Erlaube ihn in den Browsereinstellungen und versuch es erneut." : "Standort konnte nicht ermittelt werden. Versuch es draußen nochmal.");
+    }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
+  });
+}
+document.getElementById("locBtn").addEventListener("click", () => checkLoc());
 document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; });
 
 /* Katalog rendern */
@@ -684,7 +696,7 @@ function render(){
         <p class="q" id="payMsg" style="margin:8px 0 0"></p>`
         : `<h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code} ist eingegangen</h3>
         <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>${LAST_ORDER.online ? ", <b>online bezahlt</b> ✅ – bei der Übergabe zahlst du nichts mehr." : ", bar oder Karte bei der Übergabe."}</p>`}
-        <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er bei „${esc(LAST_ORDER.meet)}“ ist.</p>
+        <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er ${LAST_ORDER.meet ? `bei „${esc(LAST_ORDER.meet)}“` : "da"} ist.</p>
         ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
       </div>`
       : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
@@ -773,6 +785,7 @@ function ageOn(dob){
   return a;
 }
 document.querySelector("[name=leergut]").addEventListener("input", render);
+document.getElementById("orderForm").addEventListener("input", e => { const l = e.target.closest(".bad"); if (l) l.classList.remove("bad"); });
 document.getElementById("orderForm").addEventListener("submit", async e => {
   e.preventDefault();
   const f = e.target, err = document.getElementById("err");
@@ -780,19 +793,36 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   err.classList.remove("show");
   const t = totals();
   const ev = liveEvents().find(x => x.id === f.event.value);
+  f.querySelectorAll(".bad").forEach(x => x.classList.remove("bad"));
   if (!ev) return showErr("Gerade läuft keine Lieferung. Schau bei „Hier liefern wir“, wann wir das nächste Mal da sind.");
-  if (!LOC || LOC.event !== ev.id) return showErr("Bitte bestätige zuerst deinen Standort mit „Meinen Standort prüfen“.");
-  if (LOC.dist > ev.radius_m) return showErr(`Du bist ${Math.round(LOC.dist)} m von ${ev.ort} entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m.`);
   if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
   if (t.voll < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.voll)}.`);
-  for (const k of ["name","phone","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
-  const dob = parseDob(f.dob.value);
-  if (!dob) return showErr("Bitte gib dein Geburtsdatum als TT.MM.JJJJ ein, z. B. 05.03.2004.");
+  /* Alle fehlenden Pflichtangaben auf einmal nennen und markieren */
+  const dob = parseDob(f.dob.value), miss = [], mark = [];
+  const need = (ok, label, el) => { if (!ok){ miss.push(label); mark.push(el.closest("label") || el); } };
+  need(f.name.value.trim(), "Name", f.name);
+  need(f.phone.value.replace(/\D/g, "").length >= 6, "Handynummer", f.phone);
+  need(dob, f.dob.value.trim() ? "Geburtsdatum als TT.MM.JJJJ" : "Geburtsdatum", f.dob);
+  need(f.id.checked, "Häkchen „Ausweis zeigen“", f.id);
+  need(f.agb.checked, "Häkchen „AGB“", f.agb);
+  if (miss.length){
+    mark.forEach(x => x.classList.add("bad"));
+    const list = miss.length === 1 ? miss[0] : miss.slice(0, -1).join(", ") + " und " + miss[miss.length - 1];
+    showErr(`Bitte noch ausfüllen: ${list}.`);
+    mark[0].scrollIntoView({ block:"center", behavior:"smooth" }); const inp = mark[0].querySelector("input:not([type=checkbox])"); if (inp) setTimeout(() => inp.focus({ preventScroll:true }), 350);
+    return;
+  }
   const age = ageOn(dob);
   if (t.maxAge === 18 && age < 18) return showErr("Spirituosen und Mischgetränke mit Spirituosen gibt es erst ab 18. Entferne sie aus dem Warenkorb, um zu bestellen.");
   if (t.maxAge === 16 && age < 16) return showErr("Alkoholische Getränke gibt es erst ab 16.");
-  if (!f.id.checked) return showErr("Bestätige, dass du bei der Übergabe deinen Ausweis zeigst.");
-  if (!f.agb.checked) return showErr("Bitte akzeptiere die AGB.");
+  /* Standort automatisch prüfen, falls noch nicht geschehen */
+  if (!LOC || LOC.event !== ev.id || LOC.dist > ev.radius_m){
+    const send0 = document.getElementById("send"); send0.disabled = true; send0.textContent = "Standort wird geprüft …";
+    const ok = await checkLoc();
+    send0.disabled = false; send0.textContent = sendLabel;
+    if (!ok){ document.querySelector(".loc").classList.add("bad"); document.querySelector(".loc").scrollIntoView({ block:"center", behavior:"smooth" });
+      return showErr("Standort: " + document.getElementById("locRes").textContent); }
+  }
 
   const before = JSON.stringify(cart);
   await loadStock();
