@@ -232,6 +232,7 @@ dialog p{margin:0 0 18px}
 .legal h3{margin:18px 0 4px;font-family:var(--display)}
 .legal p{margin:0 0 8px;font-size:15px}
 </style>
+<script data-goatcounter="https://alkexpress.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
 </head>
 <body>
 
@@ -400,7 +401,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-addmore";
+const SITE_VERSION = "2026-11-03-goat";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -916,6 +917,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   }catch(x){}
   LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
+  try{ window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: LAST_ORDER.pre ? "vorbestellung" : "bestellung", title: (LAST_ORDER.pre ? "Vorbestellung " : "Bestellung ") + (LAST_ORDER.event || ""), event: true }); }catch(x){}
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });
   if (LAST_ORDER.online) zahlungStarten();
@@ -994,6 +996,7 @@ const LEGAL = {
     <p>Bestellung: Wir verarbeiten Name, Handynummer, Treffpunkt, Zahlungsart, deine bestellten Produkte und – nur wenn du ihn freigibst – deinen aktuellen Standort, um deine Bestellung abzuwickeln und dich bei der Lieferung zu erreichen (Art. 6 Abs. 1 lit. b DSGVO). Dein Geburtsdatum nutzen wir nur zur Altersprüfung im Bestellformular; es wird nicht in unserer Datenbank gespeichert. Das Alter prüfen wir zusätzlich bei der Übergabe per Ausweis.</p>
     <p>Speicherung und Kundenübersicht: Bestellungen speichern wir in unserer Datenbank (Auftragsverarbeiter: Supabase Inc., Datenbank-Hosting). Belegdaten bewahren wir wegen der gesetzlichen Aufbewahrungspflicht 7 Jahre auf (§ 132 BAO, Art. 6 Abs. 1 lit. c DSGVO). Intern fassen wir Bestellungen nach Handynummer zusammen, um zu sehen, was du bisher bestellt hast, Rückfragen schneller zu klären und unser Sortiment zu verbessern (berechtigtes Interesse, Art. 6 Abs. 1 lit. f DSGVO). Diese Übersicht sieht nur unser Team; wir geben deine Daten nicht weiter und verwenden sie nicht für Werbung. Du kannst dieser Auswertung jederzeit widersprechen – schreib uns einfach.</p>
     <p>Daten merken: Wenn du es auswählst, speichern wir Name, Handynummer, Geburtsdatum und Zahlungsart nur lokal in deinem Browser auf diesem Gerät, damit das Formular beim nächsten Mal ausgefüllt ist. Mit „Nicht du?“ löschst du sie jederzeit.</p>
+    <p>Besucherstatistik: Wir zählen Seitenaufrufe mit GoatCounter, ohne Cookies und ohne persönliche Profile. Erfasst werden nur aufgerufene Seite, Herkunftsseite, Gerätetyp, Browser und Land; IP-Adressen werden nicht gespeichert (berechtigtes Interesse, Art. 6 Abs. 1 lit. f DSGVO).</p>
     <p>Feedback-Formular: Deinen Vorschlag und, falls angegeben, deinen Kontakt speichern wir, um das Sortiment zu verbessern und dir gegebenenfalls zu antworten (Art. 6 Abs. 1 lit. f DSGVO). Wir löschen Feedback spätestens nach 12 Monaten.</p>
     <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`
 };
