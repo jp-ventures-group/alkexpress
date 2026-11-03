@@ -202,6 +202,8 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px;min-width:0}
 .req{color:var(--band18);font-weight:800;margin-left:2px} .opt{font-weight:500;color:#6B6799;font-size:14px}
 .reqnote{margin:0 0 4px;font-size:13px;color:#6B6799}
 .prebox{display:grid;gap:8px;background:#FFF7E0;border:1.5px dashed #FFC83D;border-radius:var(--r-sm);padding:12px}
+.giftbar{position:fixed;left:12px;right:12px;bottom:-120px;z-index:40;background:#4FD6A8;color:#1E1B4B;border-radius:16px;padding:14px 44px 14px 16px;font-size:15px;line-height:1.4;box-shadow:0 10px 30px rgba(0,0,0,.35);transition:bottom .35s ease}
+.giftbar.on{bottom:96px}.giftbar button{position:absolute;right:10px;top:8px;border:0;background:none;font-size:22px;cursor:pointer;color:#1E1B4B}
 .prenote[hidden]{display:none!important}
 .prenote{position:sticky;top:112px;z-index:5;background:#FFF7E0;color:#1E1B4B;border:1.5px dashed #E0A800;border-radius:14px;padding:12px 14px;margin:0 0 14px;font-size:15px;line-height:1.4;display:flex;gap:10px;align-items:center;justify-content:space-between}
 .prenote button{flex:none;border:0;background:none;font-size:20px;cursor:pointer;color:#1E1B4B}
@@ -401,7 +403,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-goat";
+const SITE_VERSION = "2026-11-03-gift";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -473,6 +475,10 @@ const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
+/* Gratis-Klopfer über die QR-Visitenkarte (?gift=klopfer) */
+let GIFT = null;
+try{ const g = new URLSearchParams(location.search).get("gift"); if (g === "klopfer") localStorage.setItem("ae_gift", JSON.stringify({ t: Date.now() }));
+  const v = JSON.parse(localStorage.getItem("ae_gift") || "null"); if (v && Date.now() - v.t < 30*864e5) GIFT = "karte"; }catch(e){}
 let ALL = {};
 function buildAll(){ ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:i.age ?? c.age}]))); }
 buildAll();
@@ -766,6 +772,7 @@ function render(){
     v.innerHTML = (t.voll < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.voll)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.voll/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px"><button type="button" id="addMore" style="border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;font-size:14px;cursor:pointer">+ Drinks hinzufügen</button><button type="button" id="clearCart" style="background:none;border:0;color:#6B6799;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:6px 0">Warenkorb leeren</button></div>
+      ${GIFT && ALL.m4 ? `<p class="q" style="margin:6px 0 0;color:var(--go);font-weight:700">🎁 + 1 Kleiner Klopfer gratis (QR-Karte, ab 18) – kommt automatisch dazu</p>` : ""}
       ${ONLINE.aktiv && !payOnline() && !isPre() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
@@ -900,7 +907,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...sbHeaders, "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
-        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
+        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
         zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar") } }) });
     const j = await r.json().catch(() => null);
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel;
@@ -917,6 +924,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   }catch(x){}
   LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
+  if (srv.gutschein){ GIFT = null; try{ localStorage.removeItem("ae_gift"); }catch(x){} }
   try{ window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: LAST_ORDER.pre ? "vorbestellung" : "bestellung", title: (LAST_ORDER.pre ? "Vorbestellung " : "Bestellung ") + (LAST_ORDER.event || ""), event: true }); }catch(x){}
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });
@@ -1011,6 +1019,8 @@ document.addEventListener("click", e => {
 document.getElementById("legalClose").onclick = () => legalDlg.close();
 
 render();
+if (GIFT){ const gb = document.createElement("div"); gb.className = "giftbar"; gb.innerHTML = `🎁 <b>Gratis Kleiner Klopfer</b> zu deiner Bestellung – kommt automatisch dazu (ab 18).<button type="button" aria-label="Schließen">×</button>`;
+  document.body.appendChild(gb); gb.querySelector("button").onclick = () => gb.remove(); setTimeout(() => gb.classList.add("on"), 400); setTimeout(() => gb.remove(), 9000); }
 loadStock();
 loadEvents();
 loadOnline();
