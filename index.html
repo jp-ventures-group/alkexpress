@@ -353,7 +353,7 @@ dialog p{margin:0 0 18px}
       <label>Geburtsdatum <input name="dob" type="text" inputmode="numeric" autocomplete="bday" placeholder="TT.MM.JJJJ" maxlength="10" required></label>
       <label>Leergut zur Rückgabe <small>Leere Dosen und PET-Flaschen mit Pfand, die du uns bei der Übergabe mitgibst. Wir ziehen 0,25 € pro Stück ab (maximal so viele, wie du Pfandgebinde bestellst).</small><input name="leergut" type="number" min="0" step="1" inputmode="numeric" value="0"></label>
       <label>Zahlung
-        <select name="pay"><option>Bar bei Übergabe</option><option>Karte bei Übergabe</option></select>
+        <select name="pay"><option value="bar">Bar bei Übergabe</option><option value="karte">Karte bei Übergabe</option></select>
       </label>
       <label class="check"><input type="checkbox" name="id" required><span>Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
       <label class="check"><input type="checkbox" name="remember" checked><span>Meine Daten auf diesem Handy merken, damit ich beim nächsten Mal nicht alles neu eintippen muss.</span></label>
@@ -380,7 +380,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-dsgvo";
+const SITE_VERSION = "2026-11-03-online";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -622,9 +622,27 @@ cat.addEventListener("click", e => {
 /* Mengenrabatt: ab 10 Minis (frei kombinierbar) 10 % auf alle Minis. Muss zur Datenbank-Funktion passen. */
 let SHOT_IDS = ["m1","m3","m4"]; const SHOT_MIN = 10, SHOT_RABATT = 0.10;
 function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
-function unitPrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
+/* Online zahlen: Rabatt aus den Einstellungen (Team-App), muss zur Datenbank-Funktion passen */
+let ONLINE = { aktiv:false, rabatt:0 };
+const payOnline = () => ONLINE.aktiv && document.querySelector("[name=pay]").value === "online";
+function basePrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
+function unitPrice(id){ const b = basePrice(id); return payOnline() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
+async function loadOnline(){
+  try{
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/einstellungen?select=online_aktiv,online_rabatt&id=eq.1`, { headers: sbHeaders, cache:"no-store" });
+    const j = (await r.json())[0]; if (!j) return;
+    ONLINE = { aktiv: !!j.online_aktiv, rabatt: Number(j.online_rabatt)||0 };
+  }catch(e){ return; }
+  const sel = document.querySelector("[name=pay]"), have = sel.querySelector('option[value="online"]');
+  if (ONLINE.aktiv && !have){ const o = new Option(`Jetzt online zahlen${ONLINE.rabatt ? ` (−${String(ONLINE.rabatt).replace(".", ",")} %)` : ""} · Karte, Apple/Google Pay`, "online"); sel.insertBefore(o, sel.firstChild);
+    if (!SAVED_PAY || SAVED_PAY === "online") sel.value = "online"; }
+  if (!ONLINE.aktiv && have) have.remove();
+  render();
+}
+document.querySelector("[name=pay]").addEventListener("change", render);
 function totals(){
   const sub = Object.entries(cart).reduce((s,[id,q]) => s + unitPrice(id)*q, 0);
+  const voll = Object.entries(cart).reduce((s,[id,q]) => s + basePrice(id)*q, 0);
   const n = Object.values(cart).reduce((a,b)=>a+b,0);
   const maxAge = Object.keys(cart).reduce((m,id)=>Math.max(m,ALL[id].age),0);
   const pfandN = Object.entries(cart).reduce((s,[id,q]) => s + (ALL[id].pfand||0)*q, 0);
@@ -632,7 +650,7 @@ function totals(){
   const retEl = document.querySelector("[name=leergut]");
   const retN = Math.min(Math.max(parseInt(retEl && retEl.value) || 0, 0), pfandN);
   const refund = retN * CONFIG.pfand;
-  return {sub, n, maxAge, pfandN, pfand, retN, refund, total: sub ? sub + CONFIG.fee + pfand - refund : 0};
+  return {sub, voll, n, maxAge, pfandN, pfand, retN, refund, total: sub ? sub + CONFIG.fee + pfand - refund : 0};
 }
 
 let LAST_ORDER = null;
@@ -651,24 +669,30 @@ function render(){
   document.getElementById("count").textContent = t.n;
   const dock = document.getElementById("dock");
   dock.classList.toggle("show", t.n > 0 && !document.getElementById("drawer").classList.contains("open"));
-  document.getElementById("dockTxt").textContent = t.sub < CONFIG.minOrder ? `Noch ${eur(CONFIG.minOrder - t.sub)} bis Mindestbestellwert` : `Warenkorb ansehen (${t.n})`;
+  document.getElementById("dockTxt").textContent = t.voll < CONFIG.minOrder ? `Noch ${eur(CONFIG.minOrder - t.voll)} bis Mindestbestellwert` : `Warenkorb ansehen (${t.n})`;
   document.getElementById("dockSum").textContent = eur(t.total);
 
   const v = document.getElementById("cartView");
   if (!t.n){
     v.innerHTML = LAST_ORDER ? `<div class="ok-box">
         <div style="font-size:34px;line-height:1">✅</div>
-        <h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code} ist eingegangen</h3>
-        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>, bar oder Karte bei der Übergabe.</p>
+        ${LAST_ORDER.online && !LAST_ORDER.bezahlt ? `<h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code}: Zahlung offen</h3>
+        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>. Deine Bestellung geht erst los, wenn sie bezahlt ist. Ohne Zahlung wird sie nach 30 Minuten storniert.</p>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button type="button" class="btn1" id="payNow">Jetzt bezahlen</button><button type="button" class="btn2" id="payCheck">Ich habe bezahlt</button></div>
+        <p class="q" id="payMsg" style="margin:8px 0 0"></p>`
+        : `<h3 style="margin:8px 0 4px">Bestellung #${LAST_ORDER.code} ist eingegangen</h3>
+        <p style="margin:0">Gesamt: <b>${eur(LAST_ORDER.gesamt)}</b>${LAST_ORDER.online ? ", <b>online bezahlt</b> ✅ – bei der Übergabe zahlst du nichts mehr." : ", bar oder Karte bei der Übergabe."}</p>`}
         <p style="margin:8px 0 0">Wir melden uns gleich per <b>WhatsApp</b> unter ${esc(LAST_ORDER.tel)} mit der Lieferzeit. Unser Fahrer ruft dich an, wenn er bei „${esc(LAST_ORDER.meet)}“ ist.</p>
         ${LAST_ORDER.age ? `<p style="margin:8px 0 0">🪪 Bitte halte deinen <b>Ausweis</b> bereit.</p>` : ""}
       </div>`
       : `<p class="empty">Noch nichts drin. Wähl im Sortiment aus, was du zum Event mitnehmen willst.</p>`;
   } else {
-    v.innerHTML = (t.sub < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.sub)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.sub/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
+    v.innerHTML = (t.voll < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.voll)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.voll/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
+      ${ONLINE.aktiv && !payOnline() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Jetzt online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
+        ${payOnline() && t.voll > t.sub ? `<div><span>Online-Rabatt (${String(ONLINE.rabatt).replace(".", ",")} %)</span><span>− ${eur(t.voll - t.sub)}</span></div>` : ""}
         <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
         <div><span>Lieferung</span><span>${CONFIG.fee ? eur(CONFIG.fee) : "gratis"}</span></div>
         ${t.pfandN ? `<div><span>Pfand (${t.pfandN} × ${eur(CONFIG.pfand)})</span><span>${eur(t.pfand)}</span></div>` : ""}
@@ -680,11 +704,12 @@ function render(){
 }
 
 /* Kundendaten von früheren Bestellungen auf diesem Gerät */
+var SAVED_PAY = null;
 (function(){
   const f = document.getElementById("orderForm");
   let k = null; try{ k = JSON.parse(localStorage.getItem("ae_kunde") || "null"); }catch(x){}
   if (!k) return;
-  if (k.name) f.name.value = k.name; if (k.phone) f.phone.value = k.phone; if (k.dob) f.dob.value = /^\d{4}-\d{2}-\d{2}$/.test(k.dob) ? k.dob.split("-").reverse().join(".") : k.dob; if (k.pay) f.pay.value = k.pay;
+  if (k.name) f.name.value = k.name; if (k.phone) f.phone.value = k.phone; if (k.dob) f.dob.value = /^\d{4}-\d{2}-\d{2}$/.test(k.dob) ? k.dob.split("-").reverse().join(".") : k.dob; if (k.pay){ SAVED_PAY = /karte/i.test(k.pay) ? "karte" : /online/.test(k.pay) ? "online" : "bar"; f.pay.value = SAVED_PAY === "online" ? "bar" : SAVED_PAY; }
   f.id.checked = true; f.agb.checked = true;
   document.getElementById("savedTxt").textContent = `Willkommen zurück, ${k.name.split(" ")[0]}! Deine Daten sind schon eingetragen.`;
   document.getElementById("savedBox").hidden = false;
@@ -757,7 +782,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   if (!LOC || LOC.event !== ev.id) return showErr("Bitte bestätige zuerst deinen Standort mit „Meinen Standort prüfen“.");
   if (LOC.dist > ev.radius_m) return showErr(`Du bist ${Math.round(LOC.dist)} m von ${ev.ort} entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m.`);
   if (!t.n) return showErr("Dein Warenkorb ist leer. Wähl zuerst Getränke aus.");
-  if (t.sub < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.sub)}.`);
+  if (t.voll < CONFIG.minOrder) return showErr(`Der Mindestbestellwert ist ${eur(CONFIG.minOrder)}. Es fehlen noch ${eur(CONFIG.minOrder - t.voll)}.`);
   for (const k of ["name","phone","meet","dob"]) if (!f[k].value.trim()) return showErr("Bitte füll alle Felder aus, damit wir dich finden.");
   const dob = parseDob(f.dob.value);
   if (!dob) return showErr("Bitte gib dein Geburtsdatum als TT.MM.JJJJ ein, z. B. 05.03.2004.");
@@ -778,7 +803,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...sbHeaders, "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
-        lat: LOC.lat, lng: LOC.lng, leergut: t.retN, zahlart: /karte/i.test(f.pay.value) ? "karte" : "bar" } }) });
+        lat: LOC.lat, lng: LOC.lng, leergut: t.retN, zahlart: ["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar" } }) });
     const j = await r.json().catch(() => null);
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel; return showErr(j.message); } else offline = true;
   }catch(x){ offline = true; }
@@ -789,10 +814,49 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     if (f.remember.checked) localStorage.setItem("ae_kunde", JSON.stringify({ name: f.name.value.trim(), phone: f.phone.value.trim(), dob: f.dob.value, pay: f.pay.value }));
     else localStorage.removeItem("ae_kunde");
   }catch(x){}
-  LAST_ORDER = { code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge };
+  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false };
+  store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });
+  if (LAST_ORDER.online) zahlungStarten();
 });
+/* Online-Zahlung (SumUp) */
+const ZAHLUNG_URL = `${CONFIG.supabaseUrl}/functions/v1/zahlung`;
+async function zahlung(body){
+  const r = await fetch(ZAHLUNG_URL, { method:"POST", headers:{ ...sbHeaders, "Content-Type":"application/json" }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Zahlung nicht möglich"); return j;
+}
+const payMsg = t => { const el = document.getElementById("payMsg"); if (el) el.textContent = t; };
+async function zahlungStarten(){
+  if (!LAST_ORDER) return; payMsg("Bezahlseite wird geöffnet …");
+  try{
+    const j = await zahlung({ aktion:"start", id: LAST_ORDER.id, zurueck: location.origin + location.pathname });
+    if (j.bezahlt){ LAST_ORDER.bezahlt = true; store.set("ae_last", { ...LAST_ORDER, t: Date.now() }); render(); return; }
+    location.href = j.url;
+  }catch(e){ payMsg(e.message + " Du kannst es nochmal versuchen."); }
+}
+async function zahlungPruefen(id, still){
+  try{
+    const j = await zahlung({ aktion:"check", id });
+    if (!LAST_ORDER || LAST_ORDER.id !== id){ const s = store.get("ae_last"); LAST_ORDER = s && s.id === id ? s : { id, code: j.code, gesamt: Number(j.gesamt), tel:"", meet:"", age:0, online:true }; }
+    LAST_ORDER.bezahlt = !!j.bezahlt; store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
+    render(); if (!j.bezahlt && !still) payMsg("Die Zahlung ist noch nicht angekommen. Falls du gerade bezahlt hast, warte kurz und tipp nochmal auf „Ich habe bezahlt“.");
+    return j.bezahlt;
+  }catch(e){ payMsg("Status konnte nicht geprüft werden. Bitte versuch es gleich nochmal."); }
+}
+document.getElementById("cartView").addEventListener("click", e => {
+  if (e.target.id === "payNow") zahlungStarten();
+  if (e.target.id === "payCheck") zahlungPruefen(LAST_ORDER.id);
+});
+/* Rückkehr von der SumUp-Bezahlseite */
+(function(){
+  const id = new URLSearchParams(location.search).get("bezahlt");
+  const s = store.get("ae_last");
+  if (id){
+    history.replaceState(null, "", location.pathname + location.hash);
+    zahlungPruefen(id, true).then(ok => { openCart(); if (!ok) setTimeout(() => zahlungPruefen(id), 4000); });
+  } else if (s && s.online && !s.bezahlt && Date.now() - s.t < 30*60e3){ LAST_ORDER = s; }
+})();
 const sendLabel = "Bestellung abschicken";
 document.getElementById("send").textContent = sendLabel;
 
@@ -840,6 +904,7 @@ document.getElementById("legalClose").onclick = () => legalDlg.close();
 render();
 loadStock();
 loadEvents();
+loadOnline();
 setInterval(renderEvents, 30000);
 setInterval(loadEvents, 300000);
 setInterval(loadStock, 60000);

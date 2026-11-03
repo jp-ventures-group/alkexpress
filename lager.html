@@ -263,6 +263,16 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
     </div>
 
     <div class="card">
+      <h2>Online-Zahlung (SumUp)</h2>
+      <form id="onlForm" style="display:grid;gap:12px">
+        <label class="check"><input type="checkbox" name="aktiv"> Im Shop „Jetzt online zahlen“ anbieten</label>
+        <label>Rabatt fürs Online-Zahlen (%) <input type="number" name="rabatt" min="0" max="50" step="0.5" inputmode="decimal"></label>
+        <button class="btn sm" type="submit">Speichern</button>
+        <div class="note hidden" id="onlMsg" role="status"></div>
+      </form>
+    </div>
+
+    <div class="card">
       <h2>Export für Steuer &amp; Buchhaltung</h2>
       <p class="q" style="margin:0 0 10px;font-size:15px">CSV-Dateien für den oben gewählten Zeitraum, z. B. für die Steuerberatung oder dein Kassabuch.</p>
       <div class="btns">
@@ -324,7 +334,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-bearbeiten";
+const APP_VERSION = "2026-11-03-online";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -430,9 +440,10 @@ async function loadOrders(){
   const since = new Date(Date.now() - 45*864e5).toISOString();
   const { data, error } = await sb.from("bestellungen").select("*").gt("created_at", since).order("created_at", { ascending:false }).limit(500);
   if (error) return;
-  const fresh = data.filter(o => o.status === (canAccept() ? "eingegangen" : "bestaetigt") && !seenIds.has(o.id) && sichtbar(o));
+  const fresh = data.filter(o => o.status === (canAccept() ? "eingegangen" : "bestaetigt") && !unbezahlt(o) && !seenIds.has(sk(o)) && sichtbar(o));
   if (seenIds.size && fresh.length) alertNew(fresh[0]);
-  data.forEach(o => seenIds.add(o.id)); if (!data.length) seenIds.add("-");
+  data.forEach(o => seenIds.add(sk(o))); if (!data.length) seenIds.add("-");
+  if (isChef() && data.some(unbezahlt) && Date.now() - AUFR > 5*60e3){ AUFR = Date.now(); zahlungFn({ aktion:"aufraeumen" }).then(j => { if (j && j.storniert) loadOrders(); }).catch(()=>{}); }
   orders = data; renderOrders(); updSum(); renderFahrer();
 }
 function alertNew(o){
@@ -449,7 +460,7 @@ function applyRole(){
   const w = $("who");
   if (REAL_ROLE === "admin"){
     w.innerHTML = `<select id="viewSel" aria-label="Ansicht" style="background:transparent;color:inherit;border:1px solid var(--line);border-radius:999px;padding:4px 8px;font:inherit;font-size:13px">${["admin","lager","fahrer"].map(k => `<option value="${k}" ${ROLE===k?"selected":""} style="color:#1E1B4B">${ROLLEN[k]}</option>`).join("")}</select>`;
-    $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(o=>o.id)); renderOrders(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`, 1800); };
+    $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(sk)); renderOrders(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`, 1800); };
   } else w.textContent = ME + " · " + (ROLLEN[ROLE] || ROLE);
   document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
   $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
@@ -501,10 +512,24 @@ function packBadge(o){
     + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isZust() ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>' : ""));
 }
 const oc = o => o.code || o.nr;
+const onl = o => o.zahlart === "online", unbezahlt = o => onl(o) && !o.bezahlt;
+const sk = o => o.id + (unbezahlt(o) ? ":u" : "");
+const zahlLabel = z => z === "bar" ? "bar" : z === "karte" ? "Karte" : z === "online" ? "online" : "";
+let AUFR = 0;
+async function zahlungFn(body){
+  const { data: { session } } = await sb.auth.getSession();
+  const r = await fetch(`${SUPA_URL}/functions/v1/zahlung`, { method:"POST", headers:{ "Content-Type":"application/json", apikey: SUPA_KEY, Authorization:`Bearer ${session ? session.access_token : SUPA_KEY}` }, body: JSON.stringify(body) });
+  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Fehler bei der Zahlung"); return j;
+}
+function payBadge(o){
+  if (!onl(o)) return "";
+  if (o.erstattet_am) return '<span class="badge" style="background:#B9B5E6;color:var(--ink)">↩︎ erstattet</span>';
+  return o.bezahlt ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">💳 bezahlt</span>' : '<span class="badge" style="background:#FFE3E0;color:#A1271D">⏳ Zahlung offen</span>';
+}
 const istTest = o => { const e = events.find(x => x.id === o.event_id); return !!(e && e.test) || Number(o.beleg_nr) < 0; };
 const belegNr = n => Number(n) < 0 ? `Ü-${-Number(n)} (Übung)` : n;
 const MSG = {
-  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
+  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n${onl(o) ? `💳 *Bereits online bezahlt* – du zahlst nichts mehr\n` : `💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n`}${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
   da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
   weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
   gleich: (o, first) => `Hi ${first} 👋\n\n🚶 *Bin in ca. 2 Minuten bei dir!* (Bestellung #${oc(o)})\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n\n_AlkExpress_`,
@@ -516,7 +541,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${payBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -532,7 +557,8 @@ function orderDetail(o){
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
     <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
-    ${!isChef() && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
+    ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
+    ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
@@ -540,12 +566,12 @@ function orderDetail(o){
       ${Number(o.liefergebuehr) ? `<li><span>Lieferung</span><span>${eur(o.liefergebuehr)}</span></li>` : ""}
       ${o.pfand>0?`<li><span>Pfand (${pfStk}×)</span><span>${eur(o.pfand)}</span></li>`:""}
       ${o.pfand_retour>0?`<li><span>Leergut retour (${o.leergut_stk}×)</span><span>− ${eur(o.pfand_retour)}</span></li>`:""}
-      <li class="tot"><span>Gesamt${o.zahlart && o.status==="geliefert"?` · ${o.zahlart==="bar"?"bar":"Karte"}`:""}</span><span>${eur(o.gesamt)}</span></li></ul>
+      <li class="tot"><span>Gesamt${o.zahlart && (o.status==="geliefert" || onl(o))?` · ${zahlLabel(o.zahlart)}`:""}</span><span>${eur(o.gesamt)}</span></li></ul>
     ${!done && isLager() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Annehmen</strong>
       <div class="btns">
-        ${o.status === "eingegangen" ? `
+        ${o.status === "eingegangen" && unbezahlt(o) ? `<span style="align-self:center">⏳ Noch nicht bezahlt – warten</span>` : o.status === "eingegangen" ? `
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
         <button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : `<span style="align-self:center">✓ Angenommen</span>`}
@@ -579,21 +605,23 @@ function orderDetail(o){
     ${!done && (isChef() || (isZust() && o.fahrer)) ? `${isChef() ? `
     <div class="sec">
       <strong style="font-size:15px">1 · Antworten</strong>
-      <div class="btns">
+      <div class="btns">${unbezahlt(o) ? `<span style="align-self:center">⏳ Erst nach der Online-Zahlung bestätigen.</span><a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>` : `
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 10))}">Bestätigen · 10 Min</a>
         <a class="btn wa" target="_blank" rel="noopener" data-act="bestaetigt" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.best(o, first, 20))}">Bestätigen · 20 Min</a>
         ${o.status === "eingegangen" ? `<button class="btn o sm" data-act="bestaetigt" data-id="${o.id}">Ohne Nachricht annehmen</button>` : ""}
         <a class="btn wa" target="_blank" rel="noopener" data-act="unterwegs" data-id="${o.id}" href="${wa(o.kunde_tel, MSG.da(o, first))}">Bin da</a>
-        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>
+        <a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.weg(o, first))}">Etwas ausverkauft</a>`}
       </div>
     </div>` : ""}
     <div class="sec">
       <strong style="font-size:15px">2 · Übergabe</strong>
       ${o.max_alter ? `<label class="check"><input type="checkbox" id="xAusweis"> Amtlichen Lichtbildausweis geprüft: mindestens ${o.max_alter} Jahre, Name passt zur Bestellung, nicht erkennbar betrunken</label>` : `<input type="checkbox" id="xAusweis" class="hidden" checked>`}
-      ${pfStk ? `<label>Leergut zurückgenommen (Stück, max. ${pfStk}) <input type="number" id="xLeer" min="0" max="${pfStk}" value="${o.leergut_stk}" inputmode="numeric"></label>` : `<input type="hidden" id="xLeer" value="0">`}
+      ${onl(o) ? `<input type="hidden" id="xLeer" value="${o.leergut_stk}">${o.leergut_stk ? `<p style="margin:0">♻️ Leergut mitnehmen: <strong>${o.leergut_stk} Stück</strong> (schon verrechnet)</p>` : ""}
+      <p style="margin:0;font-weight:800">${o.bezahlt ? "✅ Online bezahlt – nichts kassieren." : "⏳ Noch nicht bezahlt – nicht übergeben."}</p>`
+      : `${pfStk ? `<label>Leergut zurückgenommen (Stück, max. ${pfStk}) <input type="number" id="xLeer" min="0" max="${pfStk}" value="${o.leergut_stk}" inputmode="numeric"></label>` : `<input type="hidden" id="xLeer" value="0">`}
       <div><div style="font-weight:700;font-size:15px;margin-bottom:6px">Bezahlt mit</div>
         <div class="seg" id="xZahl"><button type="button" data-z="bar">Bar</button><button type="button" data-z="karte">Karte</button></div></div>
-      <div id="xSum" style="font-weight:800;font-size:18px"></div>
+      <div id="xSum" style="font-weight:800;font-size:18px"></div>`}
       <div id="xSumup" class="hidden" style="background:#EEF3FF;border-radius:14px;padding:12px;display:grid;gap:8px">
         <button type="button" class="btn" id="xSumupBtn" style="background:#000;color:#fff">💳 In SumUp kassieren</button>
         <small style="color:#5A5690">Der Betrag wird kopiert und SumUp geöffnet. Dort einfügen, Kunde zahlt per Karte. Danach hierher zurück und abschließen.</small>
@@ -618,11 +646,12 @@ function orderDetail(o){
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
     ${o.grund ? `<p style="margin:12px 0 0" class="q">Grund: ${esc(o.grund)}</p>` : ""}
+    ${isChef() && onl(o) && o.bezahlt && ["abgelehnt","storniert"].includes(o.status) ? `<div class="sec">${o.erstattet_am ? `<p style="margin:0">↩︎ ${eur(o.gesamt)} erstattet am ${fmtDT(o.erstattet_am)}</p>` : `<p style="margin:0"><strong>Online bezahlt, aber nicht geliefert.</strong> Das Geld muss zurück an den Kunden.</p><button class="btn y" data-refund="${o.id}">${eur(o.gesamt)} zurückerstatten</button>`}</div>` : ""}
     ${isChef() && istTest(o) ? `<div class="sec"><button class="btn o sm" data-deltest="${o.id}">Übungsbestellung löschen</button></div>` : ""}
   </div>`;
 }
 function updSum(){
-  const o = orders.find(x => x.id === openId); if (!o || !$("xSum")) return;
+  const o = orders.find(x => x.id === openId); if (!o || !$("xSum") || onl(o)) return;
   const pf = o.posten.reduce((s,p)=>s+p.menge*p.pfand_stk,0);
   const ret = Math.min(Math.max(parseInt($("xLeer").value)||0,0), pf);
   const tot = r2(Number(o.warenwert) + Number(o.liefergebuehr) + Number(o.pfand) - ret * (SET ? Number(SET.pfand_betrag) : .25));
@@ -663,16 +692,23 @@ $("bestList").addEventListener("click", async e => {
   if (pack){ const o = orders.find(x => x.id === pack.dataset.pack);
     const { error } = await sb.rpc("bestellung_gepackt", { b_id: o.id, wert: !o.gepackt });
     if (error) toast(error.message); loadOrders(); return; }
+  const pc = e.target.closest("[data-paycheck]");
+  if (pc){ pc.disabled = true; try{ const j = await zahlungFn({ aktion:"check", id: pc.dataset.paycheck }); toast(j.bezahlt ? "Bezahlt ✅" : "Noch keine Zahlung eingegangen."); }catch(x){ toast(x.message); } loadOrders(); return; }
+  const rf = e.target.closest("[data-refund]");
+  if (rf){ if (rf.dataset.confirm !== "1"){ rf.dataset.confirm = "1"; rf.textContent = "Wirklich zurückerstatten?"; return; }
+    rf.disabled = true; try{ await zahlungFn({ aktion:"erstatten", id: rf.dataset.refund }); toast("Erstattet. Der Kunde bekommt das Geld in ein paar Tagen zurück.", 5000); }catch(x){ toast(x.message, 6000); rf.disabled = false; } loadOrders(); return; }
   const fin = e.target.closest("[data-finish]");
   if (fin){
-    const zahl = document.querySelector("#xZahl button.on");
+    const fo = orders.find(x => x.id === fin.dataset.finish);
+    const zahl = onl(fo) ? { dataset:{ z:"online" } } : document.querySelector("#xZahl button.on");
+    if (onl(fo) && !fo.bezahlt) return note($("xMsg"), "Noch nicht online bezahlt. Nicht übergeben.");
     if (!zahl) return note($("xMsg"), "Bitte wählen: bar oder Karte.");
     if (!$("xAusweis").checked) return note($("xMsg"), "Ohne Ausweiskontrolle keine Übergabe. Im Zweifel: ablehnen.");
     fin.disabled = true;
     const { data, error } = await sb.rpc("bestellung_abschliessen", { b_id: fin.dataset.finish, p_zahlart: zahl.dataset.z, p_leergut: parseInt($("xLeer").value)||0, p_ausweis: $("xAusweis").checked });
     fin.disabled = false;
     if (error) return note($("xMsg"), error.message);
-    toast(`Erledigt: Beleg Nr. ${data.beleg_nr}, ${eur(data.gesamt)} ${data.zahlart === "bar" ? "bar" : "per Karte"}`);
+    toast(`Erledigt: Beleg Nr. ${data.beleg_nr}, ${eur(data.gesamt)} ${data.zahlart === "bar" ? "bar" : data.zahlart === "online" ? "online bezahlt" : "per Karte"}`);
     await Promise.all([loadOrders(), loadLager()]);
     showQr(orders.find(x => x.id === data.id) || data);
     return;
@@ -854,7 +890,7 @@ function renderTeam(){
           <tr><td>Letzte 18 h</td><td class="n">${mine.length}</td><td class="n">${eur(sumBy(mine,"bar"))}</td><td class="n">${eur(sumBy(mine,"karte"))}</td></tr>
           <tr><td>Dieser Monat</td><td class="n">${month.length}</td><td class="n">${eur(sumBy(month,"bar"))}</td><td class="n">${eur(sumBy(month,"karte"))}</td></tr></table>
         ${mine.length ? `<p style="margin:4px 0 0;font-weight:700;font-size:14px">Lieferungen (letzte 18 h)</p>
-        <ul class="lines" style="margin:0">${mine.map(o => `<li><span>${fmtT(o.beleg_am)} · #${oc(o)} · ${esc(o.kunde_name)}</span><span>${eur(o.gesamt)} ${o.zahlart==="bar"?"bar":"Karte"}</span></li>`).join("")}</ul>` : ""}
+        <ul class="lines" style="margin:0">${mine.map(o => `<li><span>${fmtT(o.beleg_am)} · #${oc(o)} · ${esc(o.kunde_name)}</span><span>${eur(o.gesamt)} ${zahlLabel(o.zahlart)}</span></li>`).join("")}</ul>` : ""}
         <div class="tm-edit" style="display:grid;gap:8px;border-top:1px solid #E1DEF7;padding-top:12px">
           <strong style="font-size:14px">Bearbeiten</strong>
           <label style="font-size:14px">Name <input data-tm-name value="${esc(t.name||"")}" style="margin-top:4px"></label>
@@ -1145,17 +1181,18 @@ async function renderKassa(){
   const sum = (l, f) => r2(l.reduce((s,o)=>s+Number(f(o)),0));
   const umsatz = sum(ok, o => Number(o.warenwert) + Number(o.liefergebuehr));
   const pfand = sum(ok, o => Number(o.pfand) - Number(o.pfand_retour));
-  const bar = sum(ok.filter(o=>o.zahlart==="bar"), o=>o.gesamt), karte = sum(ok.filter(o=>o.zahlart==="karte"), o=>o.gesamt);
+  const bar = sum(ok.filter(o=>o.zahlart==="bar"), o=>o.gesamt), karte = sum(ok.filter(o=>o.zahlart==="karte"), o=>o.gesamt), online = sum(ok.filter(o=>o.zahlart==="online"), o=>o.gesamt);
   $("kpis").innerHTML = `
     <div class="kpi"><b>${eur(umsatz)}</b><span>Umsatz brutto (ohne Pfand)</span></div>
     <div class="kpi"><b>${ok.length}</b><span>Lieferungen · ${rej.length} abgelehnt</span></div>
     <div class="kpi"><b>${eur(bar)}</b><span>bar kassiert</span></div>
-    <div class="kpi"><b>${eur(karte)}</b><span>per Karte</span></div>`;
+    <div class="kpi"><b>${eur(karte)}</b><span>per Karte</span></div>
+    ${online ? `<div class="kpi"><b>${eur(online)}</b><span>online bezahlt</span></div>` : ""}`;
   const split = ustSplit(ok);
   const grund = {}; rej.forEach(o => grund[o.grund||o.status] = (grund[o.grund||o.status]||0)+1);
   /* Verkaufsranking: Stück und Umsatz je Produkt (Rabatt-Zusatz im Namen zusammengefasst) */
   const prod = {};
-  ok.forEach(o => o.posten.forEach(p => { const k = p.id || p.name; const e = prod[k] ||= { name: p.name.replace(/\s*\(−10 %.*\)$/, ""), stk: 0, eur: 0 };
+  ok.forEach(o => o.posten.forEach(p => { const k = p.id || p.name; const e = prod[k] ||= { name: p.name.replace(/\s*\(−.*\)$/, ""), stk: 0, eur: 0 };
     e.stk += p.menge; e.eur += p.menge * Number(p.preis); }));
   const rank = Object.values(prod).sort((a,b) => b.eur - a.eur);
   const totEur = rank.reduce((s,x)=>s+x.eur,0) || 1, maxEur = rank.length ? rank[0].eur : 1;
@@ -1255,7 +1292,15 @@ async function loadSettings(){
   const { data } = await sb.from("einstellungen").select("*").eq("id", 1).single();
   SET = data; if (!data) return;
   const f = $("setForm"); for (const k of ["firma","inhaber","adresse","uid","liefergebuehr"]) f[k].value = data[k] ?? ""; f.kleinunternehmer.checked = data.kleinunternehmer;
+  $("onlForm").aktiv.checked = !!data.online_aktiv; $("onlForm").rabatt.value = data.online_rabatt ?? 10;
 }
+$("onlForm").addEventListener("submit", async e => {
+  e.preventDefault(); const f = e.target, row = { online_aktiv: f.aktiv.checked, online_rabatt: Math.min(50, Math.max(0, Number(f.rabatt.value)||0)) };
+  const { error } = await sb.from("einstellungen").update(row).eq("id", 1);
+  if (error) return note($("onlMsg"), error.message);
+  await sb.from("protokoll").insert({ wer: ME, aktion: "online_zahlung_geaendert", details: row });
+  note($("onlMsg"), row.online_aktiv ? `Online-Zahlung ist im Shop aktiv, ${row.online_rabatt} % Rabatt.` : "Online-Zahlung ist im Shop ausgeschaltet.", true); loadSettings();
+});
 $("setForm").addEventListener("submit", async e => {
   e.preventDefault(); const f = e.target;
   const row = { firma: f.firma.value.trim(), inhaber: f.inhaber.value.trim(), adresse: f.adresse.value.trim(), uid: f.uid.value.trim() || null, liefergebuehr: Number(f.liefergebuehr.value), kleinunternehmer: f.kleinunternehmer.checked };

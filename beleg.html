@@ -58,7 +58,7 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
         ${Number(b.pfand_retour) ? `<tr><td>Pfandrückgabe (${b.leergut_stk} Stück)</td><td class="n">− ${eur(b.pfand_retour)}</td></tr>` : ""}
         <tr class="tot"><td>Gesamt</td><td class="n">${eur(b.gesamt)}</td></tr>
       </table>
-      <div class="small">Bezahlt: ${b.zahlart === "karte" ? "Karte" : "bar"}</div>
+      <div class="small">Bezahlt: ${b.zahlart === "karte" ? "Karte" : b.zahlart === "online" ? "online (SumUp)" : "bar"}</div>
       <div class="small" style="margin-top:8px">${b.kleinunternehmer ? "Umsatzsteuerfrei aufgrund der Kleinunternehmerregelung (§ 6 Abs. 1 Z 27 UStG)." : ust.join("<br>")}</div>
       <div class="small" style="margin-top:8px">Pfand ist nicht umsatzsteuerpflichtig.</div>
       <button class="btn" onclick="print()">Drucken oder als PDF speichern</button>
