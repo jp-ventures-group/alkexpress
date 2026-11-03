@@ -438,10 +438,10 @@ let CATALOG = [
   { title:"Spirituosen & Shots", age:18, note:"Shots: ab 10 Stück 10 % Rabatt, frei kombinierbar.", items:[
     {id:"s1", name:"Absolut Vodka", size:"Flasche 0,7 l, verschlossen", price:26.9},
     {id:"s3", name:"Jägermeister", size:"Flasche 0,7 l, verschlossen", price:26.9},
+    {id:"s9", name:"Sourz Apple", size:"Flasche 0,7 l · 15 %, verschlossen", price:22.9},
     {id:"s8", name:"Hennessy VS", size:"Flasche 0,7 l, verschlossen", price:49.9},
     {id:"m1", name:"Jägermeister Shot", size:"Mini-Fläschchen 2 cl, verschlossen", price:3.0},
     {id:"m4", name:"Kleiner Klopfer Shot", size:"Mini-Fläschchen 2 cl, verschlossen", price:3.0},
-    {id:"m6", name:"Sour Apple Shot", size:"Mini-Fläschchen 2 cl, verschlossen", price:3.0},
     {id:"m3", name:"Absolut Vodka Mini", size:"Mini-Fläschchen 5 cl, verschlossen", price:6.9},
   ]},
   { title:"Zum Mischen", age:0, items:[
@@ -637,7 +637,7 @@ cat.addEventListener("click", e => {
 });
 
 /* Mengenrabatt: ab 10 Minis (frei kombinierbar) 10 % auf alle Minis. Muss zur Datenbank-Funktion passen. */
-let SHOT_IDS = ["m1","m3","m4","m6"]; const SHOT_MIN = 10, SHOT_RABATT = 0.10;
+let SHOT_IDS = ["m1","m3","m4"]; const SHOT_MIN = 10, SHOT_RABATT = 0.10;
 function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
 /* Online zahlen: Rabatt aus den Einstellungen (Team-App), muss zur Datenbank-Funktion passen */
 let ONLINE = { aktiv:false, rabatt:0 };
