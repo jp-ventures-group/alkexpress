@@ -202,6 +202,8 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px;min-width:0}
 .req{color:var(--band18);font-weight:800;margin-left:2px} .opt{font-weight:500;color:#6B6799;font-size:14px}
 .reqnote{margin:0 0 4px;font-size:13px;color:#6B6799}
 .prebox{display:grid;gap:8px;background:#FFF7E0;border:1.5px dashed #FFC83D;border-radius:var(--r-sm);padding:12px}
+.prenote{position:sticky;top:112px;z-index:5;background:#FFF7E0;color:#1E1B4B;border:1.5px dashed #E0A800;border-radius:14px;padding:12px 14px;margin:0 0 14px;font-size:15px;line-height:1.4;display:flex;gap:10px;align-items:center;justify-content:space-between}
+.prenote button{flex:none;border:0;background:none;font-size:20px;cursor:pointer;color:#1E1B4B}
 .prebox small{color:#5A5690;font-size:13px;line-height:1.4}
 .pre-btn{grid-column:2;justify-self:start;white-space:nowrap;margin-top:4px;border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:6px 12px;font-weight:700;font-size:13px;cursor:pointer}
 .bad input:not([type=checkbox]),.bad textarea,.bad select{border-color:var(--band18)!important;background:#FFF1F0}
@@ -282,6 +284,7 @@ dialog p{margin:0 0 18px}
     <div class="wrap">
       <h2>Sortiment</h2>
       <p class="lede">Alles gekühlt. <b>Mindestbestellwert 15 €</b>, Lieferung gratis. Preise inkl. USt., zzgl. 0,25 € Pfand pro Dose bzw. PET-Flasche.</p>
+      <div class="prenote" id="preNote" hidden></div>
       <div id="catalog"></div>
       <p class="note">Mindestbestellwert <span id="minVal"></span>. Lieferung gratis.</p>
     </div>
@@ -395,7 +398,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-status";
+const SITE_VERSION = "2026-11-03-preflow";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -647,8 +650,14 @@ document.getElementById("locBtn").addEventListener("click", () => checkLoc());
 document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; applyMode(); render(); });
 document.getElementById("eventList").addEventListener("click", e => {
   const b = e.target.closest("[data-pre]"); if (!b) return;
-  document.querySelector("[name=event]").value = b.dataset.pre; applyMode(); render(); openCart();
-  setTimeout(() => document.querySelector("[name=event]").scrollIntoView({ block:"center", behavior:"smooth" }), 300);
+  document.querySelector("[name=event]").value = b.dataset.pre; applyMode(); render();
+  const ev = EVENTS.find(x => x.id === b.dataset.pre);
+  if (Object.keys(cart).length){ openCart(); setTimeout(() => document.querySelector("[name=event]").scrollIntoView({ block:"center", behavior:"smooth" }), 300); return; }
+  /* Warenkorb leer: erst zum Sortiment, Event ist schon ausgewählt */
+  const n = document.getElementById("preNote");
+  n.innerHTML = `<span>📅 <b>Vorbestellung für ${esc(ev ? ev.name : "dein Event")}</b>${ev ? ` (${fmtDay(new Date(ev.liefer_von))})` : ""}. Wähl deine Drinks, dann unten auf den Warenkorb tippen.</span><button type="button" aria-label="Hinweis schließen">×</button>`;
+  n.hidden = false; n.querySelector("button").onclick = () => { n.hidden = true; };
+  document.getElementById("sortiment").scrollIntoView({ behavior:"smooth", block:"start" });
 });
 
 /* Katalog rendern */
