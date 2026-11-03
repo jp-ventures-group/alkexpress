@@ -37,7 +37,7 @@ h2{font-family:var(--display);font-weight:800;font-stretch:82%;font-size:24px;ma
 .card h2{margin-top:0;color:var(--ink)}
 .card small,.card .q{color:#5A5690}
 label{display:grid;gap:6px;font-weight:700;font-size:15px}
-.card input,.card select,.card textarea,input[type=email]{border:1.5px solid #CFCBEF;border-radius:10px;padding:11px;background:#fff;color:var(--ink);font-size:16px;width:100%}
+.card input,.card select,.card textarea,input[type=email],.evtools select{border:1.5px solid #CFCBEF;border-radius:10px;padding:11px;background:#fff;color:var(--ink);font-size:16px;width:100%}
 .btn{border:0;border-radius:999px;padding:13px 18px;font-weight:700;cursor:pointer;background:var(--ink);color:var(--paper);font-size:16px;text-decoration:none;display:inline-block;text-align:center}
 .btn.y{background:var(--y);color:var(--ink)}
 .btn.o{background:none;color:var(--ink);border:1.5px solid var(--ink)}
@@ -97,6 +97,11 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .tog input{width:18px;height:18px}
 .ev{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
 .ev .nm{font-weight:700}.ev .meta{font-size:14px;color:var(--muted)}
+.evtools{display:grid;gap:10px;margin:14px 0 4px}.evtools .chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip span{opacity:.6;font-weight:600;margin-left:2px}
+.evpast{display:flex;gap:8px;align-items:center;font-size:14px}.evpast input{width:auto}
+.arttag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle;margin-left:4px}
+.evgrp{margin-top:16px;font-weight:800;font-size:15px;padding-bottom:4px;border-bottom:2px solid var(--line)}.evgrp span{color:var(--muted);font-weight:600}
 .ev.live .meta{color:var(--g)}.ev.off .nm{opacity:.45}
 .ev .acts{display:flex;gap:6px}
 .ev .acts button{border:1px solid var(--line);background:var(--ink-2);border-radius:999px;padding:7px 12px;cursor:pointer;font-size:14px}
@@ -183,16 +188,28 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
   <section id="tab-events" class="tab hidden">
     <h1>Events</h1>
     <p class="muted" style="font-size:15px;margin:0">Nur während der Lieferzeit eines Events kann im Shop bestellt werden, und nur im eingestellten Umkreis.</p>
+    <div class="evtools">
+      <div class="chips" id="evArt"></div>
+      <div class="f2">
+        <label>Location <select id="evOrt"><option value="">Alle Locations</option></select></label>
+        <label>Sortieren <select id="evSort"><option value="datum">nach Datum</option><option value="ort">nach Location</option><option value="art">nach Art</option></select></label>
+      </div>
+      <label class="evpast"><input type="checkbox" id="evPast"> Vergangene &amp; pausierte zeigen</label>
+    </div>
     <div id="evList"></div>
     <div class="card">
       <h2 id="evHead">Event hinzufügen</h2>
       <form id="evForm" style="display:grid;gap:12px">
         <label>Name <input type="text" name="name" placeholder="z. B. Maturaball XY" required></label>
-        <label>Location <input type="text" name="ort" placeholder="z. B. Congress Graz" required></label>
+        <div class="f2">
+          <label>Location <input type="text" name="ort" placeholder="z. B. Congress Graz" list="ortList" required></label>
+          <label>Art <select name="art"><option>Maturaball</option><option>Ball</option><option>Club</option><option>Uni</option><option>Wöchentlich</option><option>Sonstiges</option></select></label>
+        </div>
+        <datalist id="ortList"></datalist>
         <div class="f2">
           <label>Datum <input type="date" name="tag" required></label>
           <label>Umkreis
-            <select name="radius"><option value="50">50 m</option><option value="100">100 m</option><option value="150" selected>150 m</option><option value="200">200 m</option><option value="300">300 m</option><option value="500">500 m</option></select>
+            <select name="radius"><option value="50">50 m</option><option value="100">100 m</option><option value="150" selected>150 m</option><option value="200">200 m</option><option value="300">300 m</option><option value="400">400 m</option><option value="500">500 m</option></select>
           </label>
         </div>
         <div class="f2">
@@ -340,7 +357,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-liefergeb";
+const APP_VERSION = "2026-11-03-evfilter";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1132,22 +1149,52 @@ async function loadEvents(){
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
   events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam(); if (KU_RAW) buildKunden();
 }
+const EV_F = { art: "", ort: "", sort: "datum", past: false };
+const evArt = e => e.art || "Sonstiges";
+const EV_ARTS = ["Maturaball","Ball","Club","Uni","Wöchentlich","Sonstiges"];
+function evRow(e, now){
+  const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), live = e.aktiv && a <= now && now < b, past = b <= now;
+  const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
+  return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
+    <div><div class="nm">${esc(e.name)} <span class="arttag">${esc(evArt(e))}</span></div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div></div>
+    <div class="acts"><button type="button" data-ev="edit" data-id="${e.id}">✎</button><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
+      <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button></div></div>`;
+}
 function renderEvents(){
   const now = new Date();
-  const list = events.filter(e => new Date(e.liefer_bis) > new Date(now - 7*864e5));
-  $("evList").innerHTML = list.length ? list.map(e => {
-    const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), live = e.aktiv && a <= now && now < b, past = b <= now;
-    const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
-    return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
-      <div><div class="nm">${esc(e.name)}</div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div></div>
-      <div class="acts"><button type="button" data-ev="edit" data-id="${e.id}">✎</button><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
-        <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button></div></div>`;
-  }).join("") : `<p class="muted">Noch keine Events eingetragen.</p>`;
+  const base = events.filter(e => new Date(e.liefer_bis) > new Date(now - 7*864e5));
+  const vis = base.filter(e => EV_F.past || (e.aktiv && new Date(e.liefer_bis) > now));
+  // Art-Chips mit Anzahl
+  const cnt = a => vis.filter(e => (!EV_F.ort || e.ort === EV_F.ort) && (!a || evArt(e) === a)).length;
+  const arts = EV_ARTS.filter(a => base.some(e => evArt(e) === a));
+  if (EV_F.art && !arts.includes(EV_F.art)) EV_F.art = "";
+  $("evArt").innerHTML = [["", "Alle"], ...arts.map(a => [a, a])].map(([v, l]) =>
+    `<button type="button" class="chip ${EV_F.art === v ? "on" : ""}" data-art="${esc(v)}">${esc(l)} <span>${cnt(v)}</span></button>`).join("");
+  // Location-Auswahl
+  const orte = [...new Set(base.map(e => e.ort))].sort((x, y) => x.localeCompare(y, "de"));
+  if (EV_F.ort && !orte.includes(EV_F.ort)) EV_F.ort = "";
+  $("evOrt").innerHTML = `<option value="">Alle Locations</option>` + orte.map(o => `<option ${o === EV_F.ort ? "selected" : ""}>${esc(o)}</option>`).join("");
+  $("ortList").innerHTML = orte.map(o => `<option value="${esc(o)}">`).join("");
+  const list = vis.filter(e => (!EV_F.art || evArt(e) === EV_F.art) && (!EV_F.ort || e.ort === EV_F.ort));
+  const byDate = (x, y) => new Date(x.liefer_von) - new Date(y.liefer_von);
+  let html = "";
+  if (EV_F.sort === "datum") html = list.sort(byDate).map(e => evRow(e, now)).join("");
+  else {
+    const key = EV_F.sort === "ort" ? (e => e.ort) : evArt;
+    const groups = [...new Set(list.map(key))].sort((x, y) => EV_F.sort === "art" ? EV_ARTS.indexOf(x) - EV_ARTS.indexOf(y) : x.localeCompare(y, "de"));
+    html = groups.map(g => { const items = list.filter(e => key(e) === g).sort(byDate);
+      return `<div class="evgrp">${esc(g)} <span>${items.length}</span></div>` + items.map(e => evRow(e, now)).join(""); }).join("");
+  }
+  $("evList").innerHTML = html || `<p class="muted">${base.length ? "Keine Events für diesen Filter." : "Noch keine Events eingetragen."}</p>`;
   const sel = $("kEvent"), prev = sel.value, now2 = Date.now();
   const past = events.filter(e => new Date(e.liefer_von) <= now2).reverse();
   sel.innerHTML = (past.length ? past : events).map(e => `<option value="${e.id}">${new Date(e.liefer_von).toLocaleDateString("de-AT")} · ${esc(e.name)}</option>`).join("");
   if (prev) sel.value = prev;
 }
+$("evArt").onclick = e => { const b = e.target.closest("[data-art]"); if (!b) return; EV_F.art = b.dataset.art; renderEvents(); };
+$("evOrt").onchange = e => { EV_F.ort = e.target.value; renderEvents(); };
+$("evSort").onchange = e => { EV_F.sort = e.target.value; renderEvents(); };
+$("evPast").onchange = e => { EV_F.past = e.target.checked; renderEvents(); };
 $("evList").addEventListener("click", async e => {
   const b = e.target.closest("button[data-ev]"); if (!b) return;
   const ev = events.find(x => x.id === b.dataset.id);
@@ -1163,7 +1210,7 @@ const hhmm = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes
 function evEdit(ev){
   const f = $("evForm"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis);
   EV_EDIT = ev.id;
-  f.name.value = ev.name; f.ort.value = ev.ort; f.tag.value = isoDay(a); f.von.value = hhmm(a); f.bis.value = hhmm(b);
+  f.name.value = ev.name; f.ort.value = ev.ort; f.art.value = evArt(ev); f.tag.value = isoDay(a); f.von.value = hhmm(a); f.bis.value = hhmm(b);
   if (![...f.radius.options].some(o => o.value === String(ev.radius_m))) f.radius.add(new Option(`${ev.radius_m} m`, ev.radius_m));
   f.radius.value = String(ev.radius_m);
   f.pos.value = `${Number(ev.lat).toFixed(6)}, ${Number(ev.lng).toFixed(6)}`; $("posInfo").textContent = `Erkannt: ${Number(ev.lat).toFixed(5)}, ${Number(ev.lng).toFixed(5)}`;
@@ -1172,7 +1219,7 @@ function evEdit(ev){
 }
 function evReset(){
   const f = $("evForm"); EV_EDIT = null;
-  f.name.value = ""; f.ort.value = ""; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; $("posInfo").textContent = "";
+  f.name.value = ""; f.ort.value = ""; f.art.value = "Maturaball"; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; $("posInfo").textContent = "";
   $("evHead").textContent = "Event hinzufügen"; $("evSubmit").textContent = "Event speichern"; $("evCancel").classList.add("hidden");
 }
 $("evCancel").onclick = evReset;
@@ -1196,7 +1243,7 @@ $("evForm").addEventListener("submit", async e => {
   if (!pos) return note($("evMsg"), "Position nicht erkannt. Füge Koordinaten wie „47.0667, 15.4296“ oder einen Google-Maps-Link ein.");
   const von = new Date(`${f.tag.value}T${f.von.value}`), bis = new Date(`${f.tag.value}T${f.bis.value}`);
   if (bis <= von) bis.setDate(bis.getDate() + 1);
-  const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString() };
+  const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), art: f.art.value, lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString() };
   const edit = EV_EDIT;
   const { error } = edit ? await sb.from("events").update(row).eq("id", edit) : await sb.from("events").insert(row);
   if (error) return note($("evMsg"), "Speichern fehlgeschlagen: " + error.message);
