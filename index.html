@@ -400,7 +400,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-preflow2";
+const SITE_VERSION = "2026-11-03-addmore";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -764,7 +764,7 @@ function render(){
   } else {
     v.innerHTML = (t.voll < CONFIG.minOrder ? `<div class="minbar">Noch ${eur(CONFIG.minOrder - t.voll)} bis zum Mindestbestellwert von ${eur(CONFIG.minOrder)}<div class="track"><div class="fill" style="width:${Math.min(100, t.voll/CONFIG.minOrder*100)}%"></div></div></div>` : "") + `<ul class="lines">${Object.entries(cart).map(([id,q]) =>
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
-      <div style="display:flex;justify-content:flex-end;margin-top:4px"><button type="button" id="clearCart" style="background:none;border:0;color:#6B6799;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:6px 0">Warenkorb leeren</button></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px"><button type="button" id="addMore" style="border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;font-size:14px;cursor:pointer">+ Drinks hinzufügen</button><button type="button" id="clearCart" style="background:none;border:0;color:#6B6799;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:6px 0">Warenkorb leeren</button></div>
       ${ONLINE.aktiv && !payOnline() && !isPre() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
@@ -945,6 +945,7 @@ async function zahlungPruefen(id, still){
   }catch(e){ payMsg("Status konnte nicht geprüft werden. Bitte versuch es gleich nochmal."); }
 }
 document.getElementById("cartView").addEventListener("click", e => {
+  if (e.target.id === "addMore"){ closeCart(); setTimeout(() => document.getElementById("sortiment").scrollIntoView({ behavior:"smooth", block:"start" }), 250); return; }
   if (e.target.id === "clearCart"){
     if (e.target.dataset.confirm !== "1"){ e.target.dataset.confirm = "1"; e.target.textContent = "Wirklich alles entfernen?"; e.target.style.color = "var(--band18)"; return; }
     cart = {}; render(); return;
