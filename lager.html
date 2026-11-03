@@ -192,9 +192,10 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
     <div class="evtools">
       <div class="chips" id="evArt"></div>
       <div class="f2">
+        <label>Stadt <select id="evStadt"><option value="">Alle Städte</option><option>Graz</option><option>Wien</option></select></label>
         <label>Location <select id="evOrt"><option value="">Alle Locations</option></select></label>
-        <label>Sortieren <select id="evSort"><option value="datum">nach Datum</option><option value="ort">nach Location</option><option value="art">nach Art</option></select></label>
       </div>
+      <label>Sortieren <select id="evSort"><option value="datum">nach Datum</option><option value="ort">nach Location</option><option value="art">nach Art</option><option value="stadt">nach Stadt</option></select></label>
       <label class="evpast"><input type="checkbox" id="evPast"> Vergangene &amp; pausierte zeigen</label>
     </div>
     <div id="evList"></div>
@@ -359,7 +360,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-csvshare";
+const APP_VERSION = "2026-11-03-evstadt";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1151,7 +1152,8 @@ async function loadEvents(){
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
   events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam(); if (KU_RAW) buildKunden();
 }
-const EV_F = { art: "", ort: "", sort: "datum", past: false };
+const EV_F = { art: "", ort: "", stadt: "", sort: "datum", past: false };
+const evStadt = e => /wien/i.test(`${e.ort} ${e.name}`) ? "Wien" : "Graz";
 const evArt = e => e.art || "Sonstiges";
 const EV_ARTS = ["Maturaball","Ball","Club","Uni","Wöchentlich","Sonstiges"];
 function evRow(e, now){
@@ -1165,24 +1167,26 @@ function evRow(e, now){
 function renderEvents(){
   const now = new Date();
   const base = events.filter(e => new Date(e.liefer_bis) > new Date(now - 7*864e5));
-  const vis = base.filter(e => EV_F.past || (e.aktiv && new Date(e.liefer_bis) > now));
-  // Art-Chips mit Anzahl
-  const cnt = a => vis.filter(e => (!EV_F.ort || e.ort === EV_F.ort) && (!a || evArt(e) === a)).length;
-  const arts = EV_ARTS.filter(a => base.some(e => evArt(e) === a));
+  const vis = base.filter(e => (EV_F.past || (e.aktiv && new Date(e.liefer_bis) > now)) && (!EV_F.stadt || evStadt(e) === EV_F.stadt));
+  // Location-Auswahl: nur Orte, die im aktuellen Filter Events haben
+  const orte = [...new Set(vis.map(e => e.ort))].sort((x, y) => x.localeCompare(y, "de"));
+  if (EV_F.ort && !orte.includes(EV_F.ort)) EV_F.ort = "";
+  $("evOrt").innerHTML = `<option value="">Alle Locations</option>` + orte.map(o => `<option value="${esc(o)}" ${o === EV_F.ort ? "selected" : ""}>${esc(o)} (${vis.filter(e => e.ort === o).length})</option>`).join("");
+  $("evOrt").value = EV_F.ort; $("evStadt").value = EV_F.stadt;
+  $("ortList").innerHTML = [...new Set(base.map(e => e.ort))].map(o => `<option value="${esc(o)}">`).join("");
+  // Art-Chips mit Anzahl, nur Arten mit Events
+  const vis2 = vis.filter(e => !EV_F.ort || e.ort === EV_F.ort);
+  const cnt = a => vis2.filter(e => !a || evArt(e) === a).length;
+  const arts = EV_ARTS.filter(a => cnt(a) > 0);
   if (EV_F.art && !arts.includes(EV_F.art)) EV_F.art = "";
   $("evArt").innerHTML = [["", "Alle"], ...arts.map(a => [a, a])].map(([v, l]) =>
     `<button type="button" class="chip ${EV_F.art === v ? "on" : ""}" data-art="${esc(v)}">${esc(l)} <span>${cnt(v)}</span></button>`).join("");
-  // Location-Auswahl
-  const orte = [...new Set(base.map(e => e.ort))].sort((x, y) => x.localeCompare(y, "de"));
-  if (EV_F.ort && !orte.includes(EV_F.ort)) EV_F.ort = "";
-  $("evOrt").innerHTML = `<option value="">Alle Locations</option>` + orte.map(o => `<option ${o === EV_F.ort ? "selected" : ""}>${esc(o)}</option>`).join("");
-  $("ortList").innerHTML = orte.map(o => `<option value="${esc(o)}">`).join("");
-  const list = vis.filter(e => (!EV_F.art || evArt(e) === EV_F.art) && (!EV_F.ort || e.ort === EV_F.ort));
+  const list = vis2.filter(e => !EV_F.art || evArt(e) === EV_F.art);
   const byDate = (x, y) => new Date(x.liefer_von) - new Date(y.liefer_von);
   let html = "";
   if (EV_F.sort === "datum") html = list.sort(byDate).map(e => evRow(e, now)).join("");
   else {
-    const key = EV_F.sort === "ort" ? (e => e.ort) : evArt;
+    const key = EV_F.sort === "ort" ? (e => e.ort) : EV_F.sort === "stadt" ? evStadt : evArt;
     const groups = [...new Set(list.map(key))].sort((x, y) => EV_F.sort === "art" ? EV_ARTS.indexOf(x) - EV_ARTS.indexOf(y) : x.localeCompare(y, "de"));
     html = groups.map(g => { const items = list.filter(e => key(e) === g).sort(byDate);
       return `<div class="evgrp">${esc(g)} <span>${items.length}</span></div>` + items.map(e => evRow(e, now)).join(""); }).join("");
@@ -1195,6 +1199,7 @@ function renderEvents(){
 }
 $("evArt").onclick = e => { const b = e.target.closest("[data-art]"); if (!b) return; EV_F.art = b.dataset.art; renderEvents(); };
 $("evOrt").onchange = e => { EV_F.ort = e.target.value; renderEvents(); };
+$("evStadt").onchange = e => { EV_F.stadt = e.target.value; EV_F.ort = ""; renderEvents(); };
 $("evSort").onchange = e => { EV_F.sort = e.target.value; renderEvents(); };
 $("evPast").onchange = e => { EV_F.past = e.target.checked; renderEvents(); };
 $("evList").addEventListener("click", async e => {
