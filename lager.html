@@ -46,6 +46,7 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .note{border-radius:10px;padding:12px;font-weight:500;margin-top:12px}
+.csvbox{margin-top:14px;padding:12px;border-radius:12px;border:1.5px solid #CFCBEF;display:grid;gap:10px;font-size:15px;word-break:break-all}.csvbox span{color:var(--muted)}
 .note.ok{background:#DDF7EE;color:#0E5A42}
 .note.err{background:#FFE4E1;color:#8E1D14}
 .hidden{display:none!important}
@@ -302,6 +303,7 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
         <button class="btn sm" data-csv="abschluesse">Tagesabschlüsse</button>
         <button class="btn sm" data-csv="protokoll">Protokoll</button>
       </div>
+      <div class="csvbox hidden" id="csvBox" role="status"></div>
     </div>
 
     <div class="card">
@@ -357,7 +359,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-evfilter";
+const APP_VERSION = "2026-11-03-csvshare";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1365,10 +1367,27 @@ function csv(name, head, lines){
   const q = v => { const s = v == null ? "" : String(v); return /[;"\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; };
   const de = v => typeof v === "number" ? String(v).replace(".", ",") : v;
   const text = "﻿" + [head, ...lines].map(l => l.map(v => q(de(v))).join(";")).join("\n");
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text], { type:"text/csv;charset=utf-8" }));
-  a.download = `alkexpress_${name}_${isoDay(new Date())}.csv`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  const fname = `alkexpress_${name}_${isoDay(new Date())}.csv`;
+  const file = new File([text], fname, { type:"text/csv" });
+  const box = $("csvBox");
+  const dl = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(file); a.download = fname;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 60000); };
+  const canShare = navigator.canShare && navigator.canShare({ files:[file] });
+  box.innerHTML = `<div><b>${esc(fname)}</b><br><span>${lines.length} ${lines.length === 1 ? "Eintrag" : "Einträge"}${lines.length ? "" : " im gewählten Zeitraum (oben bei Heute/Event/Monat umstellen)"}</span></div>
+    <div class="btns">${canShare ? `<button type="button" class="btn y sm" data-cx="share">Teilen / In Dateien sichern</button>` : ""}
+    <button type="button" class="btn sm" data-cx="dl">Herunterladen</button><button type="button" class="btn o sm" data-cx="x">Schließen</button></div>`;
+  box.classList.remove("hidden"); box.scrollIntoView({ behavior:"smooth", block:"center" });
+  box.onclick = async e => { const c = e.target.closest("[data-cx]")?.dataset.cx; if (!c) return;
+    if (c === "x") return box.classList.add("hidden");
+    if (c === "dl") return dl();
+    try { await navigator.share({ files:[file], title: fname }); } catch (err) { if (err.name !== "AbortError") dl(); } };
 }
 document.querySelectorAll("[data-csv]").forEach(b => b.onclick = async () => {
+  const old = b.textContent; b.disabled = true; b.textContent = "Lädt …";
+  try { await exportCsv(b); } catch (err) { toast("Export fehlgeschlagen: " + (err.message || err)); }
+  finally { b.disabled = false; b.textContent = old; }
+});
+async function exportCsv(b){
   const r = range(), d = x => x ? new Date(x).toLocaleString("de-AT") : "";
   if (b.dataset.csv === "belege"){
     const l = (await fetchRange("bestellungen", "created_at", r)).filter(o => o.beleg_nr && !istTest(o));
@@ -1390,7 +1409,7 @@ document.querySelectorAll("[data-csv]").forEach(b => b.onclick = async () => {
     const l = await fetchRange("protokoll", "at", r);
     csv("protokoll", ["Zeit","Wer","Aktion","Details"], l.map(p => [d(p.at), p.wer, p.aktion, JSON.stringify(p.details)]));
   }
-});
+}
 
 async function loadSettings(){
   const { data } = await sb.from("einstellungen").select("*").eq("id", 1).single();
