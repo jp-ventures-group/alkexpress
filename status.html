@@ -89,7 +89,7 @@ function render(b){
     <h1>${head}</h1>
     <p class="sub">Bestellung <b>#${esc(b.code)}</b> · ${esc(b.event || "")}</p>
     ${b.vorbestellung ? `<div class="note y">📅 Vorbestellung für ${esc(b.event||"")}${b.liefer_von ? ` am ${fD(b.liefer_von)}` : ""}${b.wunschzeit ? ` · Lieferung ab <b>${fT(b.wunschzeit)} Uhr</b>` : " · so früh wie möglich"}${b.ort ? `, ${esc(b.ort)}` : ""}</div>` : ""}
-    ${storno ? `<div class="note r">Diese Bestellung wurde ${b.status === "abgelehnt" ? "abgelehnt" : "storniert"}${b.grund ? `: ${esc(b.grund)}` : "."}${onl && b.bezahlt ? (b.erstattet ? "<br>Das Geld wurde zurückerstattet, es ist in ein paar Tagen auf deinem Konto." : "<br>Dein Geld bekommst du zurück.") : ""}</div>` : `
+    ${storno ? `<div class="note r">Diese Bestellung wurde ${b.status === "abgelehnt" ? "abgelehnt" : "storniert"}${b.grund ? `: ${esc(b.grund)}` : "."}${onl && b.bezahlt ? (b.erstattet ? (b.storno_gebuehr ? `<br>Erstattet: ${eur(b.erstattet_betrag)} (abzüglich ${eur(b.storno_gebuehr)} Stornogebühr laut AGB). Das Geld ist in ein paar Tagen auf deinem Konto.` : "<br>Das Geld wurde zurückerstattet, es ist in ein paar Tagen auf deinem Konto.") : "<br>Die Erstattung wird gerade bearbeitet.") : ""}</div>` : `
     <ol class="steps">${(() => { const ST = ["bestaetigt","unterwegs","geliefert"];
       const isDone = k => k === "eingegangen" || (k === "bezahlt" && b.bezahlt) || (k === "bestaetigt" && ST.includes(b.status)) || (k === "unterwegs" && ST.slice(1).includes(b.status)) || (k === "geliefert" && b.status === "geliefert");
       const first = steps.findIndex(([k]) => !isDone(k));

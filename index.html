@@ -375,7 +375,7 @@ dialog p{margin:0 0 18px}
       </label>
       <label class="check"><input type="checkbox" name="id" required><span><b class="req">*</b> Ich zeige bei der Übergabe meinen Ausweis und nehme die Getränke selbst entgegen.</span></label>
       <label class="check"><input type="checkbox" name="remember" checked><span>Meine Daten auf diesem Handy merken, damit ich beim nächsten Mal nicht alles neu eintippen muss.</span></label>
-      <label class="check"><input type="checkbox" name="agb" required><span><b class="req">*</b> Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>.</span></label>
+      <label class="check"><input type="checkbox" name="agb" required><span><b class="req">*</b> Ich akzeptiere die <a href="#" data-legal="agb">AGB</a>. Kann die Lieferung aus Gründen bei mir nicht übergeben werden (nicht auffindbar, kein gültiger Ausweis, falsche Angaben), fällt eine Stornogebühr von 5 € an.</span></label>
       <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <div class="err" id="err" role="alert"></div>
       <button class="send" id="send" type="submit">Bestellung abschicken</button>
@@ -399,7 +399,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-schutz";
+const SITE_VERSION = "2026-11-03-storno";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -986,6 +986,7 @@ const LEGAL = {
     <h3>Vertragsabschluss</h3><p>Mit dem Absenden machst du ein Angebot. Der Vertrag kommt zustande, wenn wir die Bestellung per WhatsApp oder E-Mail bestätigen.</p>
     <h3>Jugendschutz</h3><p>Alkoholische Getränke werden nur an Personen ab 16 Jahren, Spirituosen und spirituosenhaltige Getränke nur ab 18 Jahren übergeben. Die Übergabe erfolgt ausschließlich gegen Vorlage eines amtlichen Lichtbildausweises an die bestellende Person. Wird kein Ausweis vorgelegt, das Mindestalter nicht erreicht oder ist die Person erkennbar alkoholisiert, verweigern wir die Übergabe und stornieren die Bestellung.</p>
     <h3>Preise und Zahlung</h3><p>Alle Preise in Euro inkl. USt. Die Lieferung ist derzeit kostenlos. Auf Einweggetränkeverpackungen (Dosen, PET-Flaschen) wird das gesetzliche Pfand von 0,25 € je Stück gesondert verrechnet. Leere Pfandgebinde nehmen wir bei der Lieferung zurück und erstatten das Pfand. Zahlung bar oder mit Karte bei Übergabe.</p>
+    <h3>Stornogebühr</h3><p>Kann eine bestätigte Bestellung aus Gründen, die in der Sphäre des Kunden liegen, nicht übergeben werden – insbesondere wenn der Kunde am Treffpunkt nicht auffindbar oder telefonisch nicht erreichbar ist, keinen gültigen amtlichen Lichtbildausweis vorlegt oder falsche Angaben gemacht hat –, verrechnen wir eine pauschale Stornogebühr von 5 € für den Lieferaufwand. Bei Online-Zahlung wird der bezahlte Betrag abzüglich dieser Gebühr erstattet. Dem Kunden steht der Nachweis frei, dass uns kein oder ein geringerer Aufwand entstanden ist.</p>
     <h3>Rücktritt</h3><p>[Widerrufsbelehrung nach FAGG ergänzen – vor Veröffentlichung rechtlich prüfen lassen.]</p>`,
   datenschutz: `<h2>Datenschutz</h2>
     <p>Bestellung: Wir verarbeiten Name, Handynummer, Treffpunkt, Zahlungsart, deine bestellten Produkte und – nur wenn du ihn freigibst – deinen aktuellen Standort, um deine Bestellung abzuwickeln und dich bei der Lieferung zu erreichen (Art. 6 Abs. 1 lit. b DSGVO). Dein Geburtsdatum nutzen wir nur zur Altersprüfung im Bestellformular; es wird nicht in unserer Datenbank gespeichert. Das Alter prüfen wir zusätzlich bei der Übergabe per Ausweis.</p>
