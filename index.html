@@ -403,7 +403,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-gift";
+const SITE_VERSION = "2026-11-03-evlimit";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -572,7 +572,7 @@ function distM(a, b, c, d){
 async function loadEvents(){
   try{
     const since = new Date().toISOString();
-    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/events?select=*&aktiv=eq.true&liefer_bis=gt.${encodeURIComponent(since)}&order=liefer_von.asc&limit=30`, { headers: sbHeaders, cache:"no-store" });
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/events?select=*&aktiv=eq.true&liefer_bis=gt.${encodeURIComponent(since)}&order=liefer_von.asc&limit=200`, { headers: sbHeaders, cache:"no-store" });
     if (!r.ok) throw new Error(r.status);
     EVENTS = await r.json();
   }catch(e){ EVENTS = []; }
