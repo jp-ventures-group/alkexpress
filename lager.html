@@ -156,6 +156,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
       <button class="chip" data-f="alle">Alle</button>
     </div>
     <div id="fahrerCard"></div>
+    <div id="testBar"></div>
     <div id="legacyCard"></div>
     <div id="bestList"></div>
   </section>
@@ -306,7 +307,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-kopf";
+const APP_VERSION = "2026-11-03-uebung";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -446,7 +447,25 @@ function sichtbar(o){
     || (o.status === "geliefert" && o.fahrer === ME && Date.now() - new Date(o.beleg_am) < 18*36e5);
   return true;
 }
+function renderTestBar(){
+  const box = $("testBar"); if (!box) return;
+  const n = isChef() ? orders.filter(istTest).length : 0;
+  box.innerHTML = n ? `<div class="card" style="padding:12px 14px;display:flex;justify-content:space-between;gap:10px;align-items:center"><span style="font-size:14px"><b>${n}</b> Übungsbestellung${n>1?"en":""}</span><button class="btn o sm" data-deltest="alle">Alle löschen</button></div>` : "";
+}
+async function deleteTest(ids){
+  const { data, error } = await sb.from("bestellungen").delete().in("id", ids).select("id");
+  if (error || !data || !data.length) return toast("Löschen nicht erlaubt. In Supabase fehlt noch die Lösch-Regel (siehe Claude).", 6000);
+  await sb.from("protokoll").insert({ wer: ME, aktion: "uebung_geloescht", details: { anzahl: data.length } });
+  if (ids.includes(openId)) openId = null; toast(`${data.length} Übungsbestellung${data.length>1?"en":""} gelöscht.`); loadOrders();
+}
+document.addEventListener("click", async e => {
+  const b = e.target.closest("[data-deltest]"); if (!b) return;
+  if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.textContent = "Wirklich löschen?"; return; }
+  const ids = b.dataset.deltest === "alle" ? orders.filter(istTest).map(o => o.id) : [b.dataset.deltest];
+  b.disabled = true; await deleteTest(ids);
+});
 function renderOrders(){
+  renderTestBar();
   const today = new Date().toDateString();
   const isOpen = o => ["eingegangen","bestaetigt","unterwegs"].includes(o.status);
   const alle = orders; const orders_ = alle.filter(sichtbar);
@@ -466,6 +485,8 @@ function packBadge(o){
     + (o.fahrer ? `<span class="badge" style="background:var(--ink-2);color:#fff">🚶 ${esc(o.fahrer)}</span>` : (isZust() ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">frei</span>' : ""));
 }
 const oc = o => o.code || o.nr;
+const istTest = o => { const e = events.find(x => x.id === o.event_id); return !!(e && e.test) || Number(o.beleg_nr) < 0; };
+const belegNr = n => Number(n) < 0 ? `Ü-${-Number(n)} (Übung)` : n;
 const MSG = {
   best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
   da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
@@ -479,7 +500,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -574,13 +595,14 @@ function orderDetail(o){
       </div>
     </div>` : `<p class="muted" style="font-size:14px;margin:10px 0 0">Kein Ausweis, zu jung oder nicht auffindbar? Nicht übergeben und dem Admin Bescheid geben.</p>`}` : ""}
     ${o.status==="geliefert" ? `<div class="sec">
-      <p style="margin:0"><strong>Beleg Nr. ${o.beleg_nr}</strong> · ${fmtDT(o.beleg_am)}</p>
+      <p style="margin:0"><strong>Beleg Nr. ${belegNr(o.beleg_nr)}</strong> · ${fmtDT(o.beleg_am)}</p>
       <div class="btns">
         <button class="btn y" data-qr="${o.id}">Beleg als QR-Code zeigen</button>
         ${isChef() ? `<a class="btn wa" target="_blank" rel="noopener" href="${wa(o.kunde_tel, MSG.beleg(o, belegUrl))}">Beleg per WhatsApp senden</a>` : waBtn(o, "Beleg per WhatsApp", MSG.beleg(o, belegUrl))}
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
     ${o.grund ? `<p style="margin:12px 0 0" class="q">Grund: ${esc(o.grund)}</p>` : ""}
+    ${isChef() && istTest(o) ? `<div class="sec"><button class="btn o sm" data-deltest="${o.id}">Übungsbestellung löschen</button></div>` : ""}
   </div>`;
 }
 function updSum(){
@@ -656,7 +678,7 @@ function belegLink(o){ return new URL(`beleg.html?id=${o.id}&t=${o.token}`, loca
 function showQr(o){
   if (!o || !o.beleg_nr) return;
   const box = $("qrImg"); box.innerHTML = "";
-  $("qrSub").textContent = `Beleg Nr. ${o.beleg_nr} · ${eur(o.gesamt)}`;
+  $("qrSub").textContent = `Beleg Nr. ${belegNr(o.beleg_nr)} · ${eur(o.gesamt)}`;
   if (window.QRCode) new QRCode(box, { text: belegLink(o), width: 520, height: 520, correctLevel: QRCode.CorrectLevel.M });
   else box.innerHTML = `<p>QR-Code konnte nicht geladen werden. Bitte Beleg per WhatsApp senden.</p>`;
   $("qrModal").classList.remove("hidden");
@@ -879,7 +901,7 @@ async function loadEvents(){
   const since = new Date(Date.now() - 60*864e5).toISOString();
   const { data, error } = await sb.from("events").select("*").gt("liefer_bis", since).order("liefer_von");
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
-  events = data; renderEvents(); renderFahrer(); if (isChef() && TEAM.length) renderTeam();
+  events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam();
 }
 function renderEvents(){
   const now = new Date();
@@ -962,7 +984,8 @@ function ustSplit(list){
 async function renderKassa(){
   const r = range();
   const all = r.ev ? ((await sb.from("bestellungen").select("*").eq("event_id", r.ev.id)).data || []) : await fetchRange("bestellungen", "created_at", r);
-  const ok = all.filter(o => o.status === "geliefert"), rej = all.filter(o => ["abgelehnt","storniert"].includes(o.status));
+  const echt = all.filter(o => !istTest(o));
+  const ok = echt.filter(o => o.status === "geliefert"), rej = echt.filter(o => ["abgelehnt","storniert"].includes(o.status));
   const sum = (l, f) => r2(l.reduce((s,o)=>s+Number(f(o)),0));
   const umsatz = sum(ok, o => Number(o.warenwert) + Number(o.liefergebuehr));
   const pfand = sum(ok, o => Number(o.pfand) - Number(o.pfand_retour));
@@ -1050,7 +1073,7 @@ function csv(name, head, lines){
 document.querySelectorAll("[data-csv]").forEach(b => b.onclick = async () => {
   const r = range(), d = x => x ? new Date(x).toLocaleString("de-AT") : "";
   if (b.dataset.csv === "belege"){
-    const l = (await fetchRange("bestellungen", "created_at", r)).filter(o => o.beleg_nr);
+    const l = (await fetchRange("bestellungen", "created_at", r)).filter(o => o.beleg_nr && !istTest(o));
     csv("belege", ["Beleg-Nr","Datum","Bestell-Nr","Event","Posten","Warenwert","Liefergebühr","Pfand","Pfand retour","Gesamt","Zahlart","Ausweis geprüft","Bearbeitet von"],
       l.map(o => [o.beleg_nr, d(o.beleg_am), o.nr, o.event_name, o.posten.map(p=>`${p.menge}x ${p.name} à ${p.preis}`).join(", "), +o.warenwert, +o.liefergebuehr, +o.pfand, +o.pfand_retour, +o.gesamt, o.zahlart, o.ausweis_geprueft ? "ja" : "nein", o.bearbeitet_von]));
   }

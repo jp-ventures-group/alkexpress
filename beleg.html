@@ -44,11 +44,12 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
     const pfStk = b.posten.reduce((s,p)=>s+p.menge*p.pfand_stk,0);
     const rates = {}; b.posten.forEach(p => rates[p.ust] = (rates[p.ust]||0) + p.menge*p.preis); rates[20] = (rates[20]||0) + Number(b.liefergebuehr);
     const ust = Object.keys(rates).sort((a,c)=>c-a).map(k => { const g = rates[k], n = g/(1+k/100); return `${k} % USt: ${eur(g-n)} (netto ${eur(n)})`; });
-    document.title = `AlkExpress Beleg Nr. ${b.beleg_nr}`;
+    const bn = Number(b.beleg_nr) < 0 ? `Ü-${-Number(b.beleg_nr)}` : b.beleg_nr;
+    document.title = `AlkExpress Beleg Nr. ${bn}`;
     out.innerHTML = `<div class="slip">
       <div class="logo">Alk<b>Express</b></div>
       <div class="small">${esc(b.inhaber)}<br>${esc(b.adresse)}${b.uid ? `<br>UID: ${esc(b.uid)}` : ""}</div>
-      <h1>Beleg Nr. ${b.beleg_nr}</h1>
+      <h1>Beleg Nr. ${bn}</h1>${Number(b.beleg_nr) < 0 ? `<div style="margin:6px 0 0;padding:6px 10px;border-radius:8px;background:#FFE3E0;color:#B3261E;font-weight:700;font-size:14px">ÜBUNGSBELEG – keine echte Rechnung</div>` : ""}
       <div class="small">${new Date(b.beleg_am).toLocaleString("de-AT")} · ${esc(b.event||"")}</div>
       <table>
         ${b.posten.map(p => `<tr><td>${p.menge} × ${esc(p.name)}<div class="small">à ${eur(p.preis)}</div></td><td class="n">${eur(p.menge*p.preis)}</td></tr>`).join("")}
