@@ -334,7 +334,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-online";
+const APP_VERSION = "2026-11-03-zahlart";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -522,6 +522,8 @@ async function zahlungFn(body){
   const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(j.error || "Fehler bei der Zahlung"); return j;
 }
 function payBadge(o){
+  if (o.zahlart === "bar") return '<span class="badge" style="background:#FFF4D1;color:var(--ink)">💵 bar</span>';
+  if (o.zahlart === "karte") return '<span class="badge" style="background:#E3EAFF;color:var(--ink)">💳 Karte vor Ort</span>';
   if (!onl(o)) return "";
   if (o.erstattet_am) return '<span class="badge" style="background:#B9B5E6;color:var(--ink)">↩︎ erstattet</span>';
   return o.bezahlt ? '<span class="badge" style="background:var(--go,#4fd6a8);color:var(--ink)">💳 bezahlt</span>' : '<span class="badge" style="background:#FFE3E0;color:#A1271D">⏳ Zahlung offen</span>';
@@ -529,7 +531,7 @@ function payBadge(o){
 const istTest = o => { const e = events.find(x => x.id === o.event_id); return !!(e && e.test) || Number(o.beleg_nr) < 0; };
 const belegNr = n => Number(n) < 0 ? `Ü-${-Number(n)} (Übung)` : n;
 const MSG = {
-  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n${onl(o) ? `💳 *Bereits online bezahlt* – du zahlst nichts mehr\n` : `💶 Betrag: *${eur(o.gesamt)}* (bar oder Karte)\n`}${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
+  best: (o, first, min) => `Hi ${first} 👋\n\n✅ *Deine Bestellung #${oc(o)} ist bestätigt!*\n\n${min > 10 ? "Gerade ist viel los – " : ""}🕒 Lieferung in ca. *${min} Minuten*\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n${onl(o) ? `💳 *Bereits online bezahlt* – du zahlst nichts mehr\n` : `💶 Betrag: *${eur(o.gesamt)}* (${o.zahlart === "karte" ? "mit Karte" : o.zahlart === "bar" ? "bar" : "bar oder Karte"})\n`}${o.max_alter ? "🪪 Bitte *Ausweis* bereithalten\n" : ""}\nUnser Fahrer ruft dich an, sobald er da ist.\n\n_AlkExpress_`,
   da: (o, first) => `Hi ${first} 👋\n\n🚶 *Wir sind da!* (Bestellung #${oc(o)})\n\n📍 Wo genau bist du?\n${o.max_alter ? "🪪 Bitte Ausweis bereithalten.\n" : ""}\n_AlkExpress_`,
   weg: (o, first) => `Hi ${first},\n\n⚠️ *Bestellung #${oc(o)}*\nLeider ist etwas nicht mehr verfügbar.\n\n📞 Wir rufen dich gleich an.\n\n_AlkExpress_`,
   gleich: (o, first) => `Hi ${first} 👋\n\n🚶 *Bin in ca. 2 Minuten bei dir!* (Bestellung #${oc(o)})\n📍 Treffpunkt: *${o.treffpunkt || "–"}*\n\n_AlkExpress_`,
@@ -556,9 +558,9 @@ function orderDetail(o){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
-    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${payBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
-    ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
+    ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)} ${o.zahlart === "karte" ? "· 💳 mit Karte" : o.zahlart === "bar" ? "· 💵 bar" : ""}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     <p style="margin:8px 0 0"><a href="tel:${esc(o.kunde_tel)}">${esc(o.kunde_tel)}</a> · ${esc(o.event_name||"")} · ${fmtT(o.created_at)}</p>
     <p style="margin:2px 0 0">Treffpunkt: <strong>${esc(o.treffpunkt||"–")}</strong></p>
     ${o.lat?`<p style="margin:2px 0 0"><a href="https://maps.google.com/?q=${o.lat},${o.lng}" target="_blank" rel="noopener">Standort in Google Maps</a> <small>(${o.distanz_m} m von der Location)</small></p>`:""}
@@ -620,9 +622,10 @@ function orderDetail(o){
       <p style="margin:0;font-weight:800">${o.bezahlt ? "✅ Online bezahlt – nichts kassieren." : "⏳ Noch nicht bezahlt – nicht übergeben."}</p>`
       : `${pfStk ? `<label>Leergut zurückgenommen (Stück, max. ${pfStk}) <input type="number" id="xLeer" min="0" max="${pfStk}" value="${o.leergut_stk}" inputmode="numeric"></label>` : `<input type="hidden" id="xLeer" value="0">`}
       <div><div style="font-weight:700;font-size:15px;margin-bottom:6px">Bezahlt mit</div>
-        <div class="seg" id="xZahl"><button type="button" data-z="bar">Bar</button><button type="button" data-z="karte">Karte</button></div></div>
+        <div class="seg" id="xZahl"><button type="button" data-z="bar" class="${o.zahlart === "bar" ? "on" : ""}">Bar</button><button type="button" data-z="karte" class="${o.zahlart === "karte" ? "on" : ""}">Karte</button></div>
+        ${o.zahlart ? `<small class="muted">Kunde hat „${o.zahlart === "karte" ? "Karte vor Ort" : "bar"}“ gewählt – bei Bedarf umstellen.</small>` : ""}</div>
       <div id="xSum" style="font-weight:800;font-size:18px"></div>`}
-      <div id="xSumup" class="hidden" style="background:#EEF3FF;border-radius:14px;padding:12px;display:grid;gap:8px">
+      <div id="xSumup" class="${o.zahlart === "karte" ? "" : "hidden"}" style="background:#EEF3FF;border-radius:14px;padding:12px;display:grid;gap:8px">
         <button type="button" class="btn" id="xSumupBtn" style="background:#000;color:#fff">💳 In SumUp kassieren</button>
         <small style="color:#5A5690">Der Betrag wird kopiert und SumUp geöffnet. Dort einfügen, Kunde zahlt per Karte. Danach hierher zurück und abschließen.</small>
       </div>
