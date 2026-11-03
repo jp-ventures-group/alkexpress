@@ -334,7 +334,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-zahlart";
+const APP_VERSION = "2026-11-03-altprod";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1027,8 +1027,9 @@ function renderList(){
   $("summary").innerHTML = `<span class="chip">${units} Stück gesamt</span>` + (lw?`<span class="chip low">${lw} knapp</span>`:"") + (out?`<span class="chip out">${out} ausverkauft</span>`:"");
   const ks = kats();
   $("katList").innerHTML = ks.map(k => `<option value="${esc(k)}">`).join("");
-  const groups = ks.map(k => [k, all.filter(r => r.kategorie === k)]);
-  const rest = all.filter(r => !r.kategorie); if (rest.length) groups.push(["Alte Produkte", rest]);
+  const groups = ks.map(k => [k, all.filter(r => r.aktiv && r.kategorie === k)]);
+  const rest = all.filter(r => !r.aktiv || !r.kategorie).sort((x,y) => (x.kategorie||"~").localeCompare(y.kategorie||"~") || x.name.localeCompare(y.name));
+  if (rest.length) groups.push(["Nicht im Shop (alte Produkte)", rest]);
   $("list").innerHTML = (prodOpen === "neu" ? `<div class="grp"><h3>Neues Produkt</h3>${prodForm(null)}</div>` : "") + groups.map(([title, g]) => {
     if (!g.length) return "";
     return `<div class="grp"><h3>${esc(title)}</h3>${g.map(r => {
