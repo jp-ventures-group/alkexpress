@@ -268,7 +268,7 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
       <form id="onlForm" style="display:grid;gap:12px">
         <label class="check"><input type="checkbox" name="aktiv"> Im Shop „Jetzt online zahlen“ anbieten</label>
         <label class="check"><input type="checkbox" name="neu"> Neukunden müssen online zahlen (bar/Karte erst ab der 2. gelieferten Bestellung)</label>
-        <label>Stornogebühr bei nicht möglicher Übergabe (€) <input type="number" name="storno" min="0" max="20" step="0.5" inputmode="decimal"></label>
+        <label>Liefergebühr bei gescheiterter Übergabe (€) <input type="number" name="storno" min="0" max="20" step="0.5" inputmode="decimal"></label>
         <label>Rabatt fürs Online-Zahlen (%) <input type="number" name="rabatt" min="0" max="50" step="0.5" inputmode="decimal"></label>
         <button class="btn sm" type="submit">Speichern</button>
         <div class="note hidden" id="onlMsg" role="status"></div>
@@ -340,7 +340,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-storno";
+const APP_VERSION = "2026-11-03-liefergeb";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -670,10 +670,10 @@ function orderDetail(o){
         <a class="btn o sm" target="_blank" rel="noopener" href="${belegUrl}">Beleg ansehen</a>
       </div></div>` : ""}
     ${o.grund ? `<p style="margin:12px 0 0" class="q">Grund: ${esc(o.grund)}</p>` : ""}
-    ${isChef() && onl(o) && o.bezahlt && ["abgelehnt","storniert"].includes(o.status) ? `<div class="sec">${o.erstattet_am ? `<p style="margin:0">↩︎ ${eur(o.erstattet_betrag ?? o.gesamt)} erstattet am ${fmtDT(o.erstattet_am)}${o.storno_gebuehr ? ` · ${eur(o.storno_gebuehr)} Stornogebühr einbehalten` : ""}</p>` : (() => {
+    ${isChef() && onl(o) && o.bezahlt && ["abgelehnt","storniert"].includes(o.status) ? `<div class="sec">${o.erstattet_am ? `<p style="margin:0">↩︎ ${eur(o.erstattet_betrag ?? o.gesamt)} erstattet am ${fmtDT(o.erstattet_am)}${o.storno_gebuehr ? ` · ${eur(o.storno_gebuehr)} Liefergebühr einbehalten` : ""}</p>` : (() => {
       const geb = Math.min(Number(SET && SET.storno_gebuehr || 0), Number(o.gesamt)), mitGeb = ["Nicht auffindbar","Kein Ausweis","Fake/Troll-Bestellung","Erkennbar betrunken","Kunde storniert"].includes(o.grund);
-      return `<p style="margin:0"><strong>Online bezahlt, aber nicht geliefert.</strong> Das Geld muss zurück an den Kunden.${mitGeb && geb ? ` Grund „${esc(o.grund)}“: laut AGB darfst du ${eur(geb)} Stornogebühr einbehalten.` : ""}</p>
-      <div class="btns">${geb ? `<button class="btn ${mitGeb ? "y" : "o"}" data-refund="${o.id}" data-geb="${geb}">${eur(Number(o.gesamt) - geb)} erstatten (− ${eur(geb)} Storno)</button>` : ""}
+      return `<p style="margin:0"><strong>Online bezahlt, aber nicht geliefert.</strong> Das Geld muss zurück an den Kunden.${mitGeb && geb ? ` Grund „${esc(o.grund)}“: laut AGB darfst du ${eur(geb)} Liefergebühr einbehalten.` : ""}</p>
+      <div class="btns">${geb ? `<button class="btn ${mitGeb ? "y" : "o"}" data-refund="${o.id}" data-geb="${geb}">${eur(Number(o.gesamt) - geb)} erstatten (− ${eur(geb)} Liefergebühr)</button>` : ""}
       <button class="btn ${mitGeb && geb ? "o" : "y"}" data-refund="${o.id}" data-geb="0">${eur(o.gesamt)} komplett erstatten</button></div>
       ${o.grund === "Zu jung" ? `<p class="muted" style="font-size:13px;margin:4px 0 0">Bei Minderjährigen lieber komplett erstatten: Ein Vertrag mit ihnen ist oft nicht wirksam.</p>` : ""}`; })()}</div>` : ""}
     ${isChef() && istTest(o) ? `<div class="sec"><button class="btn o sm" data-deltest="${o.id}">Übungsbestellung löschen</button></div>` : ""}
@@ -731,7 +731,7 @@ $("bestList").addEventListener("click", async e => {
   const rf = e.target.closest("[data-refund]");
   if (rf){ if (rf.dataset.confirm !== "1"){ rf.dataset.confirm = "1"; rf.textContent = "Wirklich zurückerstatten?"; return; }
     document.querySelectorAll("[data-refund]").forEach(x => x.disabled = true);
-    try{ const j = await zahlungFn({ aktion:"erstatten", id: rf.dataset.refund, gebuehr: Number(rf.dataset.geb || 0) }); toast(j.gebuehr ? `${eur(j.betrag)} erstattet, ${eur(j.gebuehr)} Stornogebühr einbehalten.` : "Komplett erstattet. Der Kunde bekommt das Geld in ein paar Tagen zurück.", 5000); }catch(x){ toast(x.message, 6000); rf.disabled = false; } loadOrders(); return; }
+    try{ const j = await zahlungFn({ aktion:"erstatten", id: rf.dataset.refund, gebuehr: Number(rf.dataset.geb || 0) }); toast(j.gebuehr ? `${eur(j.betrag)} erstattet, ${eur(j.gebuehr)} Liefergebühr einbehalten.` : "Komplett erstattet. Der Kunde bekommt das Geld in ein paar Tagen zurück.", 5000); }catch(x){ toast(x.message, 6000); rf.disabled = false; } loadOrders(); return; }
   const fin = e.target.closest("[data-finish]");
   if (fin){
     const fo = orders.find(x => x.id === fin.dataset.finish);
