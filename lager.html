@@ -100,7 +100,7 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .ev .nm{font-weight:700}.ev .meta{font-size:14px;color:var(--muted)}
 .evtools{display:grid;gap:10px;margin:14px 0 4px}.evtools .chips{display:flex;flex-wrap:wrap;gap:6px}
 .chip span{opacity:.6;font-weight:600;margin-left:2px}
-.evpast{display:flex;gap:8px;align-items:center;font-size:14px}.evpast input{width:auto}
+.evchecks{display:flex;flex-wrap:wrap;gap:6px 18px}.evpast{display:flex;gap:8px;align-items:center;font-size:14px}.evpast input{width:auto}
 .arttag{font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;border:1px solid var(--line);color:var(--muted);vertical-align:middle;margin-left:4px}
 .evgrp{margin-top:16px;font-weight:800;font-size:15px;padding-bottom:4px;border-bottom:2px solid var(--line)}.evgrp span{color:var(--muted);font-weight:600}
 .ev.live .meta{color:var(--g)}.ev.off .nm{opacity:.45}
@@ -196,7 +196,8 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
         <label>Location <select id="evOrt"><option value="">Alle Locations</option></select></label>
       </div>
       <label>Sortieren <select id="evSort"><option value="datum">nach Datum</option><option value="ort">nach Location</option><option value="art">nach Art</option><option value="stadt">nach Stadt</option></select></label>
-      <label class="evpast"><input type="checkbox" id="evPast"> Vergangene &amp; pausierte zeigen</label>
+      <div class="evchecks"><label class="evpast"><input type="checkbox" id="evPaused"> Pausierte zeigen</label>
+        <label class="evpast"><input type="checkbox" id="evPast"> Vergangene zeigen</label></div>
     </div>
     <div id="evList"></div>
     <div class="card">
@@ -360,7 +361,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-evstadt";
+const APP_VERSION = "2026-11-03-evpaused";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1152,7 +1153,7 @@ async function loadEvents(){
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
   events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam(); if (KU_RAW) buildKunden();
 }
-const EV_F = { art: "", ort: "", stadt: "", sort: "datum", past: false };
+const EV_F = { art: "", ort: "", stadt: "", sort: "datum", past: false, paused: false };
 const evStadt = e => /wien/i.test(`${e.ort} ${e.name}`) ? "Wien" : "Graz";
 const evArt = e => e.art || "Sonstiges";
 const EV_ARTS = ["Maturaball","Ball","Club","Uni","Wöchentlich","Sonstiges"];
@@ -1167,7 +1168,10 @@ function evRow(e, now){
 function renderEvents(){
   const now = new Date();
   const base = events.filter(e => new Date(e.liefer_bis) > new Date(now - 7*864e5));
-  const vis = base.filter(e => (EV_F.past || (e.aktiv && new Date(e.liefer_bis) > now)) && (!EV_F.stadt || evStadt(e) === EV_F.stadt));
+  const inStadt = base.filter(e => !EV_F.stadt || evStadt(e) === EV_F.stadt);
+  const vis = inStadt.filter(e => (EV_F.paused || e.aktiv) && (EV_F.past || new Date(e.liefer_bis) > now));
+  const hidP = inStadt.filter(e => !e.aktiv && new Date(e.liefer_bis) > now && !EV_F.paused).length;
+  const hidV = inStadt.filter(e => new Date(e.liefer_bis) <= now && (EV_F.paused || e.aktiv) && !EV_F.past).length;
   // Location-Auswahl: nur Orte, die im aktuellen Filter Events haben
   const orte = [...new Set(vis.map(e => e.ort))].sort((x, y) => x.localeCompare(y, "de"));
   if (EV_F.ort && !orte.includes(EV_F.ort)) EV_F.ort = "";
@@ -1191,7 +1195,11 @@ function renderEvents(){
     html = groups.map(g => { const items = list.filter(e => key(e) === g).sort(byDate);
       return `<div class="evgrp">${esc(g)} <span>${items.length}</span></div>` + items.map(e => evRow(e, now)).join(""); }).join("");
   }
-  $("evList").innerHTML = html || `<p class="muted">${base.length ? "Keine Events für diesen Filter." : "Noch keine Events eingetragen."}</p>`;
+  const hint = [hidP ? `<button type="button" class="btn o sm" data-evshow="paused">${hidP} pausierte ausgeblendet – anzeigen</button>` : "",
+    hidV ? `<button type="button" class="btn o sm" data-evshow="past">${hidV} vergangene ausgeblendet – anzeigen</button>` : ""].join("");
+  $("evList").innerHTML = (html || `<p class="muted">${base.length ? "Keine aktiven Events für diesen Filter." : "Noch keine Events eingetragen."}</p>`)
+    + (hint ? `<div class="btns" style="margin-top:12px">${hint}</div>` : "");
+  $("evPaused").checked = EV_F.paused; $("evPast").checked = EV_F.past;
   const sel = $("kEvent"), prev = sel.value, now2 = Date.now();
   const past = events.filter(e => new Date(e.liefer_von) <= now2).reverse();
   sel.innerHTML = (past.length ? past : events).map(e => `<option value="${e.id}">${new Date(e.liefer_von).toLocaleDateString("de-AT")} · ${esc(e.name)}</option>`).join("");
@@ -1202,7 +1210,9 @@ $("evOrt").onchange = e => { EV_F.ort = e.target.value; renderEvents(); };
 $("evStadt").onchange = e => { EV_F.stadt = e.target.value; EV_F.ort = ""; renderEvents(); };
 $("evSort").onchange = e => { EV_F.sort = e.target.value; renderEvents(); };
 $("evPast").onchange = e => { EV_F.past = e.target.checked; renderEvents(); };
+$("evPaused").onchange = e => { EV_F.paused = e.target.checked; renderEvents(); };
 $("evList").addEventListener("click", async e => {
+  const s = e.target.closest("[data-evshow]"); if (s){ EV_F[s.dataset.evshow] = true; return renderEvents(); }
   const b = e.target.closest("button[data-ev]"); if (!b) return;
   const ev = events.find(x => x.id === b.dataset.id);
   if (b.dataset.ev === "edit") return evEdit(ev);
