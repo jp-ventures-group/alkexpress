@@ -387,7 +387,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-felder";
+const SITE_VERSION = "2026-11-03-sortiment";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -418,16 +418,17 @@ const CONFIG = {
    Einzelne Produkte können ein eigenes "age" haben (z. B. Pakete). */
 let CATALOG = [
   { title:"Pakete", age:0, items:[
-    {id:"p5", name:"Crew-Box", size:"6 × Puntigamer + 2 Hugo + 2 Spritzer", price:29.9, pfand:10, age:16},
-    {id:"p2", name:"Sixpack", size:"6 × Puntigamer 0,5 l", price:16.9, pfand:6, age:16},
+    {id:"p5", name:"Crew-Box", size:"4 Desperados + 3 Hugo + 3 Weißer Spritzer", price:29.9, pfand:6, age:16},
+    {id:"p2", name:"Sixpack", size:"6 × Desperados 0,33 l", price:18.9, age:16},
     {id:"p4", name:"Spritz-Box", size:"2 Hugo + 2 Weißer Spritzer", price:12.9, pfand:4, age:16},
     {id:"p3", name:"Anstoßen", size:"2 × Prosecco 0,75 l + 10 Becher", price:27.9, age:16},
-    {id:"p1", name:"Vodka-Paket", size:"Absolut Vodka 0,7 l + 4 Red Bull + 10 Becher", price:34.9, pfand:4, age:18},
-    {id:"p6", name:"Jäger-Paket", size:"Jägermeister 0,7 l + 4 Red Bull + 10 Becher", price:34.9, pfand:4, age:18},
+    {id:"p1", name:"Vodka-Paket", size:"Absolut Vodka 0,7 l + 4 Red Bull 0,355 l + 10 Becher", price:34.9, pfand:4, age:18},
+    {id:"p6", name:"Jäger-Paket", size:"Jägermeister 0,7 l + 4 Red Bull 0,355 l + 10 Becher", price:34.9, pfand:4, age:18},
   ]},
   { title:"Bier", age:16, items:[
-    {id:"b1", name:"Puntigamer", size:"Dose 0,5 l", price:3.0, pfand:1},
-    {id:"b6", name:"Desperados", size:"Flasche 0,33 l", price:3.5},
+    {id:"b6", name:"Desperados", size:"Flasche 0,33 l · 5,9 %", price:3.5},
+    {id:"b7", name:"Corona Extra", size:"Flasche 0,355 l · 4,5 %", price:3.5},
+    {id:"b8", name:"Heineken", size:"Flasche 0,33 l · 5 %", price:3.5},
   ]},
   { title:"Spritz & Sekt", age:16, items:[
     {id:"w1", name:"Weißer Spritzer", size:"Dose 0,33 l", price:3.5, pfand:1},
@@ -443,8 +444,9 @@ let CATALOG = [
     {id:"m3", name:"Absolut Vodka Mini", size:"Mini-Fläschchen 5 cl, verschlossen", price:6.9},
   ]},
   { title:"Zum Mischen", age:0, items:[
-    {id:"n1", name:"Red Bull", size:"Dose 0,25 l", price:2.9, pfand:1},
-    {id:"n2", name:"Cola", size:"PET-Flasche 0,5 l", price:2.5, pfand:1},
+    {id:"n1", name:"Red Bull", size:"Dose 0,355 l", price:3.5, pfand:1},
+    {id:"n2", name:"Cola", size:"Dose 0,33 l", price:2.5, pfand:1},
+    {id:"n7", name:"Sprite", size:"Dose 0,33 l", price:2.5, pfand:1},
     {id:"n6", name:"Becher", size:"10 Stück", price:1.5},
   ]},
 ];
