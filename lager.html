@@ -88,6 +88,11 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .ctl{display:flex;align-items:center;gap:6px}
 .ctl button{width:42px;height:42px;border-radius:999px;border:1px solid var(--line);background:var(--ink-2);cursor:pointer;font-size:20px}
 .ctl input{width:58px;height:42px;text-align:center;border-radius:10px;border:1px solid var(--line);background:var(--ink-2);font-weight:700;font-variant-numeric:tabular-nums}
+.pe{display:grid;gap:10px;color:var(--ink);background:#F4F2FF;border:1px solid var(--line);border-radius:14px;padding:14px;margin:4px 0 12px}
+.pe label{font-size:14px;font-weight:600;color:var(--ink)} .pe .muted,.pe .tog{color:#5A5690}
+.edit-btn{border:1px solid var(--line);background:var(--ink-2);border-radius:999px;padding:5px 11px;cursor:pointer;font-size:13px;margin-top:4px;margin-left:8px}
+.zrow{display:grid;grid-template-columns:minmax(0,1fr) 84px 44px;gap:8px;align-items:center}
+.zrow .x{height:44px;border-radius:12px;border:1px solid var(--line);background:#fff;font-size:22px;cursor:pointer;color:var(--ink)}
 .tog{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center;margin-top:4px;font-weight:500}
 .tog input{width:18px;height:18px}
 .ev{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;padding:12px 0;border-bottom:1px solid var(--line)}
@@ -170,6 +175,8 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
     <div class="chips" id="summary"></div>
     <p class="muted" style="font-size:15px;margin:6px 0 0">Ausverkaufte Produkte zeigt der Shop automatisch als „ausverkauft“. „Im Shop“ aus = ganz ausblenden.</p>
     <div id="list"></div>
+    <button type="button" class="btn o" id="newProd" style="margin-top:14px">+ Neues Produkt</button>
+    <datalist id="katList"></datalist>
   </section>
 
   <section id="tab-events" class="tab hidden">
@@ -177,7 +184,7 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
     <p class="muted" style="font-size:15px;margin:0">Nur während der Lieferzeit eines Events kann im Shop bestellt werden, und nur im eingestellten Umkreis.</p>
     <div id="evList"></div>
     <div class="card">
-      <h2>Event hinzufügen</h2>
+      <h2 id="evHead">Event hinzufügen</h2>
       <form id="evForm" style="display:grid;gap:12px">
         <label>Name <input type="text" name="name" placeholder="z. B. Maturaball XY" required></label>
         <label>Location <input type="text" name="ort" placeholder="z. B. Congress Graz" required></label>
@@ -194,7 +201,8 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
         <label>Position der Location <small>Google-Maps-Link oder Koordinaten einfügen, oder vor Ort Standort übernehmen</small>
           <input type="text" name="pos" placeholder="z. B. 47.0667, 15.4296" required></label>
         <div class="btns" style="align-items:center"><button type="button" class="btn sm" id="hereBtn">Aktuellen Standort übernehmen</button><span id="posInfo" style="font-size:14px;color:#5A5690"></span></div>
-        <button class="btn y" type="submit">Event speichern</button>
+        <button class="btn y" type="submit" id="evSubmit">Event speichern</button>
+        <button class="btn o hidden" type="button" id="evCancel">Abbrechen</button>
         <div class="note hidden" id="evMsg" role="status"></div>
       </form>
     </div>
@@ -286,6 +294,11 @@ nav.tabs .cnt{display:inline-block;min-width:20px;height:20px;line-height:20px;b
     <h1>Team</h1>
     <p class="muted" style="font-size:15px">Admins sehen und dürfen alles. Lager nimmt Bestellungen an und packt sie. Zusteller sehen nur bestätigte Bestellungen ihres Events, liefern und kassieren.</p>
     <div id="teamList"></div>
+    <h2 style="margin-top:26px">Kunden</h2>
+    <p class="muted" style="font-size:14px;margin:0 0 8px">Aus allen Bestellungen, zusammengefasst nach Handynummer. Übungsbestellungen zählen nicht.</p>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px"><input type="search" id="kuSuche" placeholder="Name oder Nummer suchen"><button type="button" class="btn o sm" id="kuCsv">CSV</button></div>
+    <div class="chips" id="kuSort" style="margin-top:8px"><button class="chip on" data-s="zuletzt">Zuletzt</button><button class="chip" data-s="umsatz">Umsatz</button><button class="chip" data-s="anzahl">Bestellungen</button></div>
+    <div id="kuList"></div>
     <h2 style="margin-top:26px">Kunden-Feedback</h2>
     <div class="chips" id="fbFilter"><button class="chip on" data-f="neu">Neu</button><button class="chip" data-f="alle">Alle</button></div>
     <div id="fbList"></div>
@@ -311,7 +324,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-felder";
+const APP_VERSION = "2026-11-03-bearbeiten";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -342,7 +355,6 @@ const isZust = () => ROLE === "fahrer";            // Zusteller (intern weiter "
 const canAccept = () => isChef() || isLager();
 const ROLLEN = { admin:"Admin", lager:"Lager", fahrer:"Zusteller" };
 let ME = "", rows = [], edits = {}, events = [], orders = [], SET = null, openId = null, seenIds = new Set();
-const GROUPS = [["p","Pakete"],["b","Bier & Cider"],["w","Wein & Sekt"],["s","Spirituosen & Mischgetränke"],["n","Ohne Alkohol & Zubehör"]];
 const STATUS = { eingegangen:"Neu", bestaetigt:"Bestätigt", unterwegs:"Unterwegs", geliefert:"Geliefert", abgelehnt:"Abgelehnt", storniert:"Storniert" };
 
 /* Links aus WhatsApp merken, bevor der Login die URL ändert */
@@ -394,7 +406,7 @@ async function start(){
   renderLegacy();
   if (!started){ started = true;
     sb.channel("best").on("postgres_changes", { event:"*", schema:"public", table:"bestellungen" }, () => loadOrders()).subscribe();
-    sb.channel("lager").on("postgres_changes", { event:"UPDATE", schema:"public", table:"lager" }, () => { if (!Object.keys(edits).length) loadLager(); }).subscribe();
+    sb.channel("lager").on("postgres_changes", { event:"UPDATE", schema:"public", table:"lager" }, () => { if (!Object.keys(edits).length && !prodOpen) loadLager(); }).subscribe();
     setInterval(loadOrders, isChef() ? 60000 : 20000);
   }
 }
@@ -746,9 +758,72 @@ $("fbList").onclick = async e => { const b = e.target.closest("[data-fbdone]"); 
   const { error } = await sb.from("feedback").update({ erledigt: b.dataset.v === "true" }).eq("id", b.dataset.fbdone);
   if (error) return toast(error.message); loadFeedback(); };
 
+/* ---- Kunden ---- */
+let KU_RAW = null, KUNDEN = [], kuOpen = null, kuSort = "zuletzt", kuLimit = 30;
+const normTel = t => { let d = String(t||"").replace(/[^\d+]/g, ""); if (d.startsWith("+")) d = d.slice(1); else if (d.startsWith("00")) d = d.slice(2); else if (d.startsWith("0")) d = "43" + d.slice(1); return d; };
+async function loadKunden(){
+  if (!isChef()) return;
+  const { data, error } = await sb.from("bestellungen").select("id,code,nr,kunde_name,kunde_tel,posten,gesamt,status,created_at,event_id,event_name,beleg_nr,zahlart").order("created_at", { ascending:false }).limit(5000);
+  if (error) return toast("Kunden konnten nicht geladen werden: " + error.message);
+  KU_RAW = data || []; buildKunden();
+}
+function buildKunden(){
+  const m = new Map();
+  for (const o of KU_RAW || []){
+    if (istTest(o)) continue;
+    const key = normTel(o.kunde_tel) || o.kunde_name; if (!key) continue;
+    let k = m.get(key); if (!k){ k = { key, name: o.kunde_name, tel: o.kunde_tel, orders: [], umsatz: 0, n: 0, prod: {}, last: o.created_at, first: o.created_at, events: new Set() }; m.set(key, k); }
+    k.orders.push(o); k.first = o.created_at;
+    if (o.status === "geliefert"){ k.n++; k.umsatz += Number(o.gesamt);
+      (o.posten || []).forEach(p => { const nm = String(p.name||p.id).replace(/ \(−10 %.*$/, "").split(" · ")[0]; k.prod[nm] = (k.prod[nm]||0) + (p.menge||0); }); }
+    if (o.event_name) k.events.add(o.event_name);
+  }
+  KUNDEN = [...m.values()]; renderKunden();
+}
+function renderKunden(){
+  const q = $("kuSuche").value.trim().toLowerCase(), qd = q.replace(/\D/g, "");
+  let l = KUNDEN.filter(k => !q || (k.name||"").toLowerCase().includes(q) || (qd && normTel(k.tel).includes(qd.replace(/^0/, ""))));
+  l.sort(kuSort === "umsatz" ? (a,b) => b.umsatz - a.umsatz : kuSort === "anzahl" ? (a,b) => b.n - a.n || b.orders.length - a.orders.length : (a,b) => new Date(b.last) - new Date(a.last));
+  const more = l.length > kuLimit; l = l.slice(0, kuLimit);
+  const ST = { eingegangen:"neu", bestaetigt:"bestätigt", unterwegs:"unterwegs", geliefert:"geliefert", abgelehnt:"abgelehnt", storniert:"storniert" };
+  $("kuList").innerHTML = (l.length ? l.map(k => {
+    const open = kuOpen === k.key, top = Object.entries(k.prod).sort((a,b) => b[1]-a[1]);
+    const wa = normTel(k.tel);
+    return `<div class="card" style="padding:14px 16px;cursor:pointer" data-ku="${esc(k.key)}" role="button" tabindex="0" aria-expanded="${open}">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start">
+        <div><strong>${esc(k.name||"–")}</strong>${k.n >= 3 ? ` <span class="badge" style="background:var(--y);color:var(--ink)">Stammkunde</span>` : ""}
+          <div class="muted" style="font-size:14px">${esc(k.tel||"")} · zuletzt ${new Date(k.last).toLocaleDateString("de-AT")}</div>
+          <div style="font-size:14px;margin-top:4px">${k.n} ${k.n === 1 ? "Lieferung" : "Lieferungen"} · <strong>${eur(k.umsatz)}</strong>${top.length ? ` · meist ${esc(top[0][0])}` : ""}</div></div>
+        <span style="font-size:20px;color:var(--muted);line-height:1">${open ? "–" : "+"}</span>
+      </div>
+      ${open ? `<div class="sec">
+        <div class="btns"><a class="btn sm" href="tel:${esc(k.tel)}">📞 Anrufen</a>${wa ? `<a class="btn o sm" href="https://wa.me/${wa}" target="_blank" rel="noopener">WhatsApp</a>` : ""}</div>
+        <p style="margin:0;font-size:14px">Kunde seit ${new Date(k.first).toLocaleDateString("de-AT")} · ${k.orders.length} Bestellungen insgesamt · Ø ${eur(k.n ? k.umsatz/k.n : 0)} pro Lieferung</p>
+        ${top.length ? `<p style="margin:4px 0 0;font-weight:700;font-size:14px">Was er/sie bestellt</p>
+        <ul class="lines" style="margin:0">${top.map(([n,c]) => `<li><span>${esc(n)}</span><span>${c}×</span></li>`).join("")}</ul>` : ""}
+        <p style="margin:4px 0 0;font-weight:700;font-size:14px">Bestellungen</p>
+        <ul class="lines" style="margin:0">${k.orders.map(o => `<li><span>${new Date(o.created_at).toLocaleDateString("de-AT")} · #${oc(o)} · ${esc(o.event_name||"")}<br><small class="muted">${(o.posten||[]).map(p => `${p.menge}× ${esc(String(p.name).split(" · ")[0])}`).join(", ")}</small></span><span>${eur(o.gesamt)}<br><small class="muted">${ST[o.status]||o.status}</small></span></li>`).join("")}</ul>
+      </div>` : ""}
+    </div>`;
+  }).join("") : `<p class="muted">${q ? "Niemand gefunden." : "Noch keine Kunden."}</p>`)
+    + (more ? `<button type="button" class="btn o sm" id="kuMore" style="margin-top:8px">Mehr anzeigen</button>` : "");
+}
+$("kuSuche").addEventListener("input", () => { kuLimit = 30; renderKunden(); });
+$("kuSort").onclick = e => { const b = e.target.closest("[data-s]"); if (!b) return; kuSort = b.dataset.s;
+  document.querySelectorAll("#kuSort .chip").forEach(c => c.classList.toggle("on", c === b)); renderKunden(); };
+$("kuList").addEventListener("click", e => {
+  if (e.target.closest("#kuMore")){ kuLimit += 30; renderKunden(); return; }
+  if (e.target.closest("a")) return;
+  const c = e.target.closest("[data-ku]"); if (!c) return;
+  kuOpen = kuOpen === c.dataset.ku ? null : c.dataset.ku; renderKunden();
+});
+$("kuCsv").onclick = () => csv("kunden", ["Name","Telefon","Lieferungen","Umsatz","Erste Bestellung","Letzte Bestellung","Produkte"],
+  KUNDEN.map(k => [k.name, k.tel, k.n, Math.round(k.umsatz*100)/100, new Date(k.first).toLocaleDateString("de-AT"), new Date(k.last).toLocaleDateString("de-AT"),
+    Object.entries(k.prod).sort((a,b) => b[1]-a[1]).map(([n,c]) => `${c}× ${n}`).join(", ")]));
+
 async function loadTeam(){
   if (!isChef()) return;
-  loadFeedback();
+  loadFeedback(); loadKunden();
   const { data } = await sb.from("admins").select("*").order("rolle").order("name");
   TEAM = data || []; renderTeam();
 }
@@ -851,6 +926,55 @@ async function loadLager(){
   rows = data; edits = {}; renderList();
 }
 function cur(r){ return Object.assign({}, r, edits[r.id]||{}); }
+let prodOpen = null;
+function kats(){ const m = {}; rows.forEach(r => { if (r.kategorie) m[r.kategorie] = Math.min(m[r.kategorie] ?? 1e9, r.sort ?? 100); });
+  return Object.keys(m).sort((a,b) => m[a]-m[b]); }
+function prodForm(r){
+  const v = r || { name:"", groesse:"", preis:"", pfand_stk:0, alter_ab:16, kategorie: kats()[0] || "", shot:false };
+  return `<div class="pe" data-peform="${r ? r.id : "neu"}">
+    <label>Name <input data-f="name" value="${esc(v.name)}" placeholder="z. B. Gösser"></label>
+    <label>Größe / Beschreibung <input data-f="groesse" value="${esc(v.groesse||"")}" placeholder="z. B. Dose 0,5 l"></label>
+    <div class="f2">
+      <label>Preis (€) <input data-f="preis" type="text" inputmode="decimal" value="${v.preis === "" ? "" : String(v.preis).replace(".", ",")}" placeholder="3,50"></label>
+      <label>Pfand-Stück <input data-f="pfand_stk" type="number" min="0" inputmode="numeric" value="${v.pfand_stk||0}"></label>
+    </div>
+    <div class="f2">
+      <label>Alter <select data-f="alter_ab">${[[0,"ohne"],[16,"ab 16"],[18,"ab 18"]].map(([a,t]) => `<option value="${a}" ${Number(v.alter_ab)===a?"selected":""}>${t}</option>`).join("")}</select></label>
+      <label>Kategorie <input data-f="kategorie" list="katList" value="${esc(v.kategorie||"")}" placeholder="z. B. Bier"></label>
+    </div>
+    <label class="tog" style="font-size:14px"><input type="checkbox" data-f="shot" ${v.shot?"checked":""}> Zählt als Shot (ab 10 Stück −10 %)</label>
+    <p class="muted" style="font-size:13px;margin:0">Pfand-Stück = Anzahl Dosen/Flaschen mit Pfand (je 0,25 €). Änderungen sind sofort im Shop.</p>
+    <div class="btns"><button type="button" class="btn y sm" data-pesave>${r ? "Speichern" : "Produkt anlegen"}</button><button type="button" class="btn o sm" data-pecancel>Abbrechen</button></div>
+  </div>`;
+}
+async function saveProd(box){
+  const id = box.dataset.peform, g = k => box.querySelector(`[data-f="${k}"]`);
+  const patch = { name: g("name").value.trim(), groesse: g("groesse").value.trim(), preis: Number(g("preis").value.replace(",", ".")),
+    pfand_stk: Math.max(0, parseInt(g("pfand_stk").value)||0), alter_ab: parseInt(g("alter_ab").value)||0,
+    kategorie: g("kategorie").value.trim(), shot: g("shot").checked };
+  if (!patch.name) return toast("Bitte einen Namen eingeben.");
+  if (!(patch.preis > 0)) return toast("Bitte einen gültigen Preis eingeben.");
+  if (!patch.kategorie) return toast("Bitte eine Kategorie eingeben.");
+  patch.preis = Math.round(patch.preis*100)/100;
+  if (id === "neu"){
+    const same = rows.filter(r => r.kategorie === patch.kategorie), all = rows.map(r => r.sort ?? 100);
+    const row = Object.assign({ id: "x" + Date.now().toString(36), aktiv: true, bestand: 0, mindest: 0, ust: 20,
+      sort: same.length ? Math.max(...same.map(r => r.sort ?? 100)) + 1 : Math.max(0, ...all) + 10 }, patch);
+    const { data, error } = await sb.from("lager").insert(row).select().single();
+    if (error) return toast("Anlegen fehlgeschlagen: " + error.message);
+    rows.push(data || row);
+    await sb.from("protokoll").insert({ wer: ME, aktion: "produkt_angelegt", details: row });
+    toast(`„${patch.name}“ angelegt. Bestand mit + eintragen, dann ist es bestellbar.`, 5000);
+  } else {
+    const { error } = await sb.from("lager").update(patch).eq("id", id);
+    if (error) return toast("Speichern fehlgeschlagen: " + error.message);
+    Object.assign(rows.find(r => r.id === id), patch);
+    await sb.from("protokoll").insert({ wer: ME, aktion: "produkt_geaendert", details: Object.assign({ id }, patch) });
+    toast("Gespeichert. Der Shop zeigt es sofort.");
+  }
+  prodOpen = null; renderList();
+}
+$("newProd").onclick = () => { prodOpen = "neu"; renderList(); $("list").scrollIntoView({ behavior:"smooth" }); };
 function setEdit(id, patch){
   const base = rows.find(r => r.id===id), next = Object.assign({}, edits[id]||{}, patch);
   for (const k in next) if (next[k] === base[k]) delete next[k];
@@ -862,19 +986,24 @@ function renderList(){
   const low = r => r.aktiv && r.bestand > 0 && r.bestand <= Math.max(r.mindest, 3);
   const out = all.filter(r => r.aktiv && r.bestand===0).length, lw = all.filter(low).length, units = all.reduce((s,r)=>s+r.bestand,0);
   $("summary").innerHTML = `<span class="chip">${units} Stück gesamt</span>` + (lw?`<span class="chip low">${lw} knapp</span>`:"") + (out?`<span class="chip out">${out} ausverkauft</span>`:"");
-  $("list").innerHTML = GROUPS.map(([p,title]) => {
-    const g = all.filter(r => r.id.startsWith(p)); if (!g.length) return "";
-    return `<div class="grp"><h3>${title}</h3>${g.map(r => {
+  const ks = kats();
+  $("katList").innerHTML = ks.map(k => `<option value="${esc(k)}">`).join("");
+  const groups = ks.map(k => [k, all.filter(r => r.kategorie === k)]);
+  const rest = all.filter(r => !r.kategorie); if (rest.length) groups.push(["Alte Produkte", rest]);
+  $("list").innerHTML = (prodOpen === "neu" ? `<div class="grp"><h3>Neues Produkt</h3>${prodForm(null)}</div>` : "") + groups.map(([title, g]) => {
+    if (!g.length) return "";
+    return `<div class="grp"><h3>${esc(title)}</h3>${g.map(r => {
       const cls = !r.aktiv ? "off" : r.bestand===0 ? "out" : low(r) ? "low" : "";
       const meta = !r.aktiv ? "im Shop ausgeblendet" : r.bestand===0 ? "ausverkauft" : low(r) ? "knapp" : "verfügbar";
       return `<div class="row ${cls}">
         <div><div class="nm">${esc(r.name)}</div><div class="meta">${eur(r.preis)} · ${meta}${edits[r.id]?" · geändert":""}</div>
-          <label class="tog"><input type="checkbox" data-act="aktiv" data-id="${r.id}" ${r.aktiv?"checked":""}> Im Shop</label></div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap"><label class="tog"><input type="checkbox" data-act="aktiv" data-id="${r.id}" ${r.aktiv?"checked":""}> Im Shop</label>
+          <button type="button" class="edit-btn" data-pe="${r.id}">${prodOpen === r.id ? "Schließen" : "✎ Bearbeiten"}</button></div></div>
         <div class="ctl" role="group" aria-label="Bestand ${esc(r.name)}">
           <button type="button" data-act="dec" data-id="${r.id}" aria-label="${esc(r.name)} weniger">−</button>
           <input type="number" min="0" inputmode="numeric" data-act="set" data-id="${r.id}" value="${r.bestand}" aria-label="Bestand ${esc(r.name)}">
           <button type="button" data-act="inc" data-id="${r.id}" aria-label="${esc(r.name)} mehr">+</button>
-        </div></div>`; }).join("")}</div>`;
+        </div></div>${prodOpen === r.id ? prodForm(r) : ""}`; }).join("")}</div>`;
   }).join("");
   const n = Object.keys(edits).length;
   $("saveBar").classList.toggle("hidden", !n || $("tab-lager").classList.contains("hidden"));
@@ -882,12 +1011,15 @@ function renderList(){
   renderZugang();
 }
 $("list").addEventListener("click", e => {
+  const pe = e.target.closest("[data-pe]"); if (pe){ prodOpen = prodOpen === pe.dataset.pe ? null : pe.dataset.pe; renderList(); return; }
+  if (e.target.closest("[data-pecancel]")){ prodOpen = null; renderList(); return; }
+  if (e.target.closest("[data-pesave]")){ saveProd(e.target.closest("[data-peform]")); return; }
   const b = e.target.closest("button[data-act]"); if (!b) return;
   const r = cur(rows.find(x => x.id===b.dataset.id));
   setEdit(r.id, { bestand: Math.max(0, r.bestand + (b.dataset.act==="inc" ? 1 : -1)) });
 });
 $("list").addEventListener("change", e => {
-  const t = e.target; if (!t.dataset.act) return;
+  const t = e.target; if (!t.dataset.act || t.closest("[data-peform]")) return;
   if (t.dataset.act==="set") setEdit(t.dataset.id, { bestand: Math.max(0, parseInt(t.value)||0) });
   if (t.dataset.act==="aktiv") setEdit(t.dataset.id, { aktiv: t.checked });
 });
@@ -905,7 +1037,7 @@ async function loadEvents(){
   const since = new Date(Date.now() - 60*864e5).toISOString();
   const { data, error } = await sb.from("events").select("*").gt("liefer_bis", since).order("liefer_von");
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
-  events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam();
+  events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam(); if (KU_RAW) buildKunden();
 }
 function renderEvents(){
   const now = new Date();
@@ -915,7 +1047,7 @@ function renderEvents(){
     const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
     return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
       <div><div class="nm">${esc(e.name)}</div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div></div>
-      <div class="acts"><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
+      <div class="acts"><button type="button" data-ev="edit" data-id="${e.id}">✎</button><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
         <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button></div></div>`;
   }).join("") : `<p class="muted">Noch keine Events eingetragen.</p>`;
   const sel = $("kEvent"), prev = sel.value, now2 = Date.now();
@@ -926,12 +1058,31 @@ function renderEvents(){
 $("evList").addEventListener("click", async e => {
   const b = e.target.closest("button[data-ev]"); if (!b) return;
   const ev = events.find(x => x.id === b.dataset.id);
+  if (b.dataset.ev === "edit") return evEdit(ev);
   if (b.dataset.ev === "toggle") await sb.from("events").update({ aktiv: !ev.aktiv }).eq("id", ev.id);
   if (b.dataset.ev === "del"){ if (b.dataset.confirm !== "1"){ b.dataset.confirm = "1"; b.textContent = "Wirklich löschen?"; return; }
     await sb.from("events").delete().eq("id", ev.id); }
   await sb.from("protokoll").insert({ wer: ME, aktion: b.dataset.ev === "del" ? "event_geloescht" : "event_umgeschaltet", details: { name: ev.name, aktiv: !ev.aktiv } });
   loadEvents();
 });
+let EV_EDIT = null;
+const hhmm = d => `${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+function evEdit(ev){
+  const f = $("evForm"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis);
+  EV_EDIT = ev.id;
+  f.name.value = ev.name; f.ort.value = ev.ort; f.tag.value = isoDay(a); f.von.value = hhmm(a); f.bis.value = hhmm(b);
+  if (![...f.radius.options].some(o => o.value === String(ev.radius_m))) f.radius.add(new Option(`${ev.radius_m} m`, ev.radius_m));
+  f.radius.value = String(ev.radius_m);
+  f.pos.value = `${Number(ev.lat).toFixed(6)}, ${Number(ev.lng).toFixed(6)}`; $("posInfo").textContent = `Erkannt: ${Number(ev.lat).toFixed(5)}, ${Number(ev.lng).toFixed(5)}`;
+  $("evHead").textContent = `„${ev.name}“ bearbeiten`; $("evSubmit").textContent = "Änderungen speichern"; $("evCancel").classList.remove("hidden");
+  $("evHead").scrollIntoView({ behavior:"smooth", block:"start" });
+}
+function evReset(){
+  const f = $("evForm"); EV_EDIT = null;
+  f.name.value = ""; f.ort.value = ""; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; $("posInfo").textContent = "";
+  $("evHead").textContent = "Event hinzufügen"; $("evSubmit").textContent = "Event speichern"; $("evCancel").classList.add("hidden");
+}
+$("evCancel").onclick = evReset;
 function parsePos(t){
   const m = t.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || t.match(/[?&]q=(-?\d+\.\d+),\s*(-?\d+\.\d+)/) || t.match(/(-?\d{1,2}\.\d+)\s*[,; ]\s*(-?\d{1,3}\.\d+)/);
   if (!m) return null; const lat = parseFloat(m[1]), lng = parseFloat(m[2]);
@@ -953,11 +1104,12 @@ $("evForm").addEventListener("submit", async e => {
   const von = new Date(`${f.tag.value}T${f.von.value}`), bis = new Date(`${f.tag.value}T${f.bis.value}`);
   if (bis <= von) bis.setDate(bis.getDate() + 1);
   const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString() };
-  const { error } = await sb.from("events").insert(row);
+  const edit = EV_EDIT;
+  const { error } = edit ? await sb.from("events").update(row).eq("id", edit) : await sb.from("events").insert(row);
   if (error) return note($("evMsg"), "Speichern fehlgeschlagen: " + error.message);
-  await sb.from("protokoll").insert({ wer: ME, aktion: "event_angelegt", details: row });
-  note($("evMsg"), `„${row.name}“ gespeichert. Es erscheint jetzt im Shop.`, true);
-  f.name.value = ""; f.ort.value = ""; f.pos.value = ""; $("posInfo").textContent = "";
+  await sb.from("protokoll").insert({ wer: ME, aktion: edit ? "event_geaendert" : "event_angelegt", details: row });
+  note($("evMsg"), edit ? `„${row.name}“ geändert. Der Shop zeigt es sofort.` : `„${row.name}“ gespeichert. Es erscheint jetzt im Shop.`, true);
+  evReset();
   loadEvents();
 });
 
@@ -1049,9 +1201,10 @@ $("ekTyp").onclick = e => { const b = e.target.closest("[data-t]"); if (!b) retu
   document.querySelectorAll("#ekTyp button").forEach(x => x.classList.toggle("on", x===b));
   $("katWrap").classList.toggle("hidden", ekTyp !== "ausgabe"); $("zugangWrap").classList.toggle("hidden", ekTyp !== "ware"); };
 function renderZugang(){
-  $("zugang").innerHTML = zugangRows.map((z,i) => `<div class="f2"><select data-z="${i}" data-k="id" aria-label="Produkt">${rows.map(r => `<option value="${r.id}" ${r.id===z.id?"selected":""}>${esc(r.name)}</option>`).join("")}</select>
-    <input type="number" min="1" data-z="${i}" data-k="q" value="${z.q}" inputmode="numeric" aria-label="Menge"></div>`).join("");
+  $("zugang").innerHTML = zugangRows.map((z,i) => `<div class="zrow"><select data-z="${i}" data-k="id" aria-label="Produkt">${rows.map(r => `<option value="${r.id}" ${r.id===z.id?"selected":""}>${esc(r.name)}</option>`).join("")}</select>
+    <input type="number" min="1" data-z="${i}" data-k="q" value="${z.q}" inputmode="numeric" aria-label="Menge"><button type="button" class="x" data-zdel="${i}" aria-label="Zeile entfernen">×</button></div>`).join("");
 }
+$("zugang").addEventListener("click", e => { const b = e.target.closest("[data-zdel]"); if (!b) return; zugangRows.splice(Number(b.dataset.zdel), 1); renderZugang(); });
 $("addZugang").onclick = () => { zugangRows.push({ id: rows[0] ? rows[0].id : "", q: 1 }); renderZugang(); };
 $("zugang").addEventListener("change", e => { const i = e.target.dataset.z; if (i == null) return; zugangRows[i][e.target.dataset.k] = e.target.dataset.k === "q" ? parseInt(e.target.value)||0 : e.target.value; });
 $("ekForm").addEventListener("submit", async e => {

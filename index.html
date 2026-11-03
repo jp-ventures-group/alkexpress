@@ -380,7 +380,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-02-dob";
+const SITE_VERSION = "2026-11-03-katalog";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -409,7 +409,7 @@ const CONFIG = {
 };
 /* Sortiment: age 16 = Bier/Wein/Sekt, 18 = Spirituosen. Richtpreise inkl. USt. – anpassen.
    Einzelne Produkte können ein eigenes "age" haben (z. B. Pakete). */
-const CATALOG = [
+let CATALOG = [
   { title:"Pakete", age:0, items:[
     {id:"p5", name:"Crew-Box", size:"6 × Puntigamer + 2 Hugo + 2 Spritzer", price:29.9, pfand:10, age:16},
     {id:"p2", name:"Sixpack", size:"6 × Puntigamer 0,5 l", price:16.9, pfand:6, age:16},
@@ -448,9 +448,33 @@ const store = {
   get(k){ try{ return JSON.parse(localStorage.getItem(k)); }catch(e){ return null; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
-const ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:i.age ?? c.age}])));
+let ALL = {};
+function buildAll(){ ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:i.age ?? c.age}]))); }
+buildAll();
 let cart = store.get("ae24_cart") || {};
 for (const id in cart) if (!ALL[id]) delete cart[id];
+/* Sortiment aus der Datenbank (im Team-App bearbeitbar). Fällt offline auf CATALOG oben zurück. */
+const SHOT_NOTE = "Shots: ab 10 Stück 10 % Rabatt, frei kombinierbar.";
+function catalogFromDb(rows){
+  const act = rows.filter(r => r.aktiv && r.kategorie).sort((a,b) => (a.sort??100)-(b.sort??100) || a.name.localeCompare(b.name));
+  if (!act.length) return false;
+  const cats = [];
+  for (const r of act){
+    let c = cats.find(x => x.title === r.kategorie); if (!c){ c = { title:r.kategorie, items:[] }; cats.push(c); }
+    c.items.push({ id:r.id, name:r.name, size:r.groesse||"", price:Number(r.preis), pfand:r.pfand_stk||0, age:r.alter_ab||0, shot:!!r.shot });
+  }
+  for (const c of cats){
+    const ages = [...new Set(c.items.map(i => i.age))];
+    c.age = ages.length === 1 ? ages[0] : 0;
+    if (c.age) c.items.forEach(i => { delete i.age; });
+    if (c.items.some(i => i.shot)) c.note = SHOT_NOTE;
+  }
+  CATALOG = cats; buildAll();
+  for (const id in cart) if (!ALL[id]) delete cart[id];
+  SHOT_IDS = Object.keys(ALL).filter(id => ALL[id].shot);
+  renderCatalog();
+  return true;
+}
 
 /* Bändchen-Laufschrift */
 const t18 = "18+ SPIRITUOSEN ✦ AUSWEIS BEREITHALTEN ✦ ";
@@ -465,10 +489,11 @@ document.getElementById("minVal").textContent = eur(CONFIG.minOrder);
 let STOCK = null;
 async function loadStock(){
   try{
-    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/lager?select=id,bestand,aktiv`, {
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/lager?select=id,name,groesse,preis,pfand_stk,alter_ab,kategorie,sort,shot,bestand,aktiv`, {
       headers:{ apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` }, cache:"no-store" });
     if (!r.ok) throw new Error(r.status);
     const rows = await r.json();
+    catalogFromDb(rows);
     // Lager noch nie befüllt (alles 0)? Dann Bestand ignorieren, sonst wäre alles „ausverkauft“.
     STOCK = rows.some(x => x.bestand > 0) ? Object.fromEntries(rows.map(x => [x.id, x.aktiv ? x.bestand : 0])) : null;
   }catch(e){ /* offline oder nicht erreichbar: ohne Bestandsanzeige weiter */ }
@@ -567,22 +592,25 @@ document.querySelector("[name=event]").addEventListener("change", () => { LOC = 
 
 /* Katalog rendern */
 const cat = document.getElementById("catalog");
+function renderCatalog(){
 cat.innerHTML = CATALOG.map(c => `
   <div class="cat">
-    <div class="cat-head"><h3>${c.title}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>${c.note ? `<p class="q" style="margin:-4px 0 8px;color:var(--band16);font-weight:700;font-size:14px">${c.note}</p>` : ""}
+    <div class="cat-head"><h3>${esc(c.title)}</h3>${c.age ? `<span class="tag t${c.age}">ab ${c.age}</span>` : ""}</div>${c.note ? `<p class="q" style="margin:-4px 0 8px;color:var(--band16);font-weight:700;font-size:14px">${c.note}</p>` : ""}
     <ul class="items">${c.items.map(i => `
       <li class="item" id="it_${i.id}">
-        <div><div class="nm">${i.name}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${i.size}<span class="stk" id="stk_${i.id}"></span></div></div>
+        <div><div class="nm">${esc(i.name)}${i.age ? ` <span class="tag t${i.age}">ab ${i.age}</span>` : ""}</div><div class="sz">${esc(i.size)}<span class="stk" id="stk_${i.id}"></span></div></div>
         <div class="right">
           <span class="price">${eur(i.price)}${i.pfand ? `<small class="pf">+ ${eur(i.pfand*CONFIG.pfand)} Pfand</small>` : ""}</span>
-          <div class="step" role="group" aria-label="Menge ${i.name}">
-            <button type="button" data-dec="${i.id}" aria-label="${i.name} weniger">−</button>
+          <div class="step" role="group" aria-label="Menge ${esc(i.name)}">
+            <button type="button" data-dec="${i.id}" aria-label="${esc(i.name)} weniger">−</button>
             <output id="q_${i.id}">0</output>
-            <button type="button" data-inc="${i.id}" aria-label="${i.name} mehr">+</button>
+            <button type="button" data-inc="${i.id}" aria-label="${esc(i.name)} mehr">+</button>
           </div>
         </div>
       </li>`).join("")}</ul>
   </div>`).join("");
+}
+renderCatalog();
 
 cat.addEventListener("click", e => {
   const inc = e.target.dataset.inc, dec = e.target.dataset.dec;
@@ -592,7 +620,7 @@ cat.addEventListener("click", e => {
 });
 
 /* Mengenrabatt: ab 10 Minis (frei kombinierbar) 10 % auf alle Minis. Muss zur Datenbank-Funktion passen. */
-const SHOT_IDS = ["m1","m3","m4"], SHOT_MIN = 10, SHOT_RABATT = 0.10;
+let SHOT_IDS = ["m1","m3","m4"]; const SHOT_MIN = 10, SHOT_RABATT = 0.10;
 function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
 function unitPrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
 function totals(){
