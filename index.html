@@ -403,7 +403,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-prerabatt";
+const SITE_VERSION = "2026-11-04-preohne";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -562,7 +562,7 @@ function applyMode(){
     pay.value = "online"; pay.disabled = true;
   } else if (pay.disabled){ pay.disabled = false; if (pay.dataset.prev && pay.querySelector(`option[value="${pay.dataset.prev}"]`)) pay.value = pay.dataset.prev; }
   payLabel();
-  if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online (Vorbestellungen ohne Rabatt). Wir liefern am Event-Abend zu deiner Wunschzeit, <b>nur im Umkreis von ${ev.radius_m} m um ${esc(ev.ort)}</b>, und melden uns vorher per WhatsApp.`;
+  if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online. Wir liefern am Event-Abend zu deiner Wunschzeit, <b>nur im Umkreis von ${ev.radius_m} m um ${esc(ev.ort)}</b>, und melden uns vorher per WhatsApp.`;
   if (pre && ev && MODE_EV !== ev.id){
     const w = document.querySelector("[name=wunsch]"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis), opts = ['<option value="">So früh wie möglich</option>'];
     for (let t = new Date(a); t < b; t = new Date(t.getTime() + 30*60e3)) opts.push(`<option value="${t.toISOString()}">ab ${fmtTime(t)} Uhr</option>`);
@@ -718,7 +718,7 @@ function basePrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) &&
 /* Bei Vorbestellungen gibt es keinen Online-Rabatt, daher auch kein "−10 %" im Text */
 function payLabel(){
   const o = document.querySelector('[name=pay] option[value="online"]'); if (!o) return;
-  o.textContent = isPre() ? "Online zahlen (Karte, Apple Pay) – Vorbestellung ohne Rabatt"
+  o.textContent = isPre() ? "Online zahlen (Karte, Apple Pay)"
     : `Online zahlen${ONLINE.rabatt ? ` −${String(ONLINE.rabatt).replace(".", ",")} %` : ""} (Karte, Apple Pay)`;
 }
 function unitPrice(id){ const b = basePrice(id); return payOnline() && !isPre() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
