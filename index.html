@@ -403,7 +403,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-gift1x";
+const SITE_VERSION = "2026-11-04-prerabatt";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -558,9 +558,10 @@ function applyMode(){
   if (pre){
     if (!pay.disabled) pay.dataset.prev = pay.value;
     let o = pay.querySelector('option[value="online"]');
-    if (!o){ o = new Option("Online zahlen (Karte, Apple Pay)", "online"); pay.insertBefore(o, pay.firstChild); }
+    if (!o){ o = new Option("", "online"); pay.insertBefore(o, pay.firstChild); }
     pay.value = "online"; pay.disabled = true;
   } else if (pay.disabled){ pay.disabled = false; if (pay.dataset.prev && pay.querySelector(`option[value="${pay.dataset.prev}"]`)) pay.value = pay.dataset.prev; }
+  payLabel();
   if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online (Vorbestellungen ohne Rabatt). Wir liefern am Event-Abend zu deiner Wunschzeit, <b>nur im Umkreis von ${ev.radius_m} m um ${esc(ev.ort)}</b>, und melden uns vorher per WhatsApp.`;
   if (pre && ev && MODE_EV !== ev.id){
     const w = document.querySelector("[name=wunsch]"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis), opts = ['<option value="">So früh wie möglich</option>'];
@@ -636,6 +637,7 @@ function renderEvents(){
   if (!live.length && pre.length && ONLINE.aktiv){ const st2 = document.getElementById("statusSub"); if (!st2.textContent.includes("vorbestellen")) st2.textContent += " · Jetzt schon vorbestellen!"; }
   applyMode();
   if (LOC && LOC.event !== sel.value) { LOC = null; document.getElementById("locRes").textContent = ""; }
+  if (Object.keys(cart).length) render();
   render();
 }
 /* Standort prüfen: per Knopf oder automatisch beim Abschicken. Liefert true, wenn im Umkreis. */
@@ -713,6 +715,12 @@ function shotCount(){ return SHOT_IDS.reduce((s,id)=>s+(cart[id]||0),0); }
 let ONLINE = { aktiv:false, rabatt:0 };
 const payOnline = () => ONLINE.aktiv && document.querySelector("[name=pay]").value === "online";
 function basePrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) && shotCount() >= SHOT_MIN ? Math.round(p*(1-SHOT_RABATT)*100)/100 : p; }
+/* Bei Vorbestellungen gibt es keinen Online-Rabatt, daher auch kein "−10 %" im Text */
+function payLabel(){
+  const o = document.querySelector('[name=pay] option[value="online"]'); if (!o) return;
+  o.textContent = isPre() ? "Online zahlen (Karte, Apple Pay) – Vorbestellung ohne Rabatt"
+    : `Online zahlen${ONLINE.rabatt ? ` −${String(ONLINE.rabatt).replace(".", ",")} %` : ""} (Karte, Apple Pay)`;
+}
 function unitPrice(id){ const b = basePrice(id); return payOnline() && !isPre() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
 async function loadOnline(){
   try{
@@ -721,9 +729,10 @@ async function loadOnline(){
     ONLINE = { aktiv: !!j.online_aktiv, rabatt: Number(j.online_rabatt)||0 };
   }catch(e){ return; }
   const sel = document.querySelector("[name=pay]"), have = sel.querySelector('option[value="online"]');
-  if (ONLINE.aktiv && !have){ const o = new Option(`Online zahlen${ONLINE.rabatt ? ` −${String(ONLINE.rabatt).replace(".", ",")} %` : ""} (Karte, Apple Pay)`, "online"); sel.insertBefore(o, sel.firstChild);
+  if (ONLINE.aktiv && !have){ const o = new Option("", "online"); sel.insertBefore(o, sel.firstChild);
     if (!SAVED_PAY || SAVED_PAY === "online") sel.value = "online"; }
   if (!ONLINE.aktiv && have) have.remove();
+  payLabel();
   renderEvents();
 }
 document.querySelector("[name=pay]").addEventListener("change", render);
