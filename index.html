@@ -239,6 +239,9 @@ dialog.acct .muted{color:#5A5690;font-size:14px}
 .ord{border:1.5px solid #E2DFF7;border-radius:14px;padding:12px;margin:0 0 10px}.ord .t{display:flex;justify-content:space-between;gap:8px;font-weight:700}
 .ord .s{font-size:14px;color:#5A5690;margin:2px 0 8px}.ord .row{margin:0}.ord a,.ord button{font-size:14px;padding:8px 14px}
 .vbadge{display:inline-block;background:#D1FADF;color:#067647;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+.gsbox{margin:12px 0 0;font-size:14px}.gsbox summary{cursor:pointer;font-weight:700;text-decoration:underline}.gsbox>span{margin-right:8px}
+.gsrow{display:flex;gap:8px;margin-top:8px}.gsrow input{flex:1;min-width:0;border:1.5px solid #CFCBEF;border-radius:10px;padding:10px;font:inherit;font-size:16px;text-transform:uppercase}
+.gsbox button{border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer}#gsMsg{margin-top:6px;color:#B42318}
 .acct-hint{font-size:14px;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#EFEDFF;color:var(--ink)}.acct-hint:empty{display:none}
 .acct-hint button{border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0;font-size:14px}
 dialog h2{font-size:36px}
@@ -426,7 +429,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-vorlocation";
+const SITE_VERSION = "2026-11-04-gutschein";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -759,6 +762,26 @@ async function loadOnline(){
   renderEvents();
 }
 document.querySelector("[name=pay]").addEventListener("change", render);
+/* Gutscheincode (Guthaben), wird beim Abschicken vom Server geprüft und abgebucht */
+let GS = store.get("ae_gs");
+function gsSet(v){ GS = v; if (v) store.set("ae_gs", v); else { try{ localStorage.removeItem("ae_gs"); }catch(e){} } }
+async function gsEinloesen(code){
+  const m = document.getElementById("gsMsg"), b = document.getElementById("gsBtn");
+  if (!code.trim()){ m.textContent = "Bitte gib deinen Code ein."; return; }
+  b.disabled = true; m.textContent = "Wird geprüft …";
+  try{
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/gutschein_pruefen`, { method:"POST", headers:{ ...sbHeaders, "Content-Type":"application/json" }, body: JSON.stringify({ p_code: code }) });
+    const j = await r.json();
+    if (!r.ok || !j.ok){ m.textContent = (j && (j.grund || j.message)) || "Dieser Code ist ungültig."; b.disabled = false; return; }
+    gsSet({ code: j.code, rest: Number(j.rest) }); render();
+  }catch(e){ m.textContent = "Gerade keine Verbindung. Bitte nochmal versuchen."; b.disabled = false; }
+}
+const gsFmt = c => String(c || "").replace(/^(AE)(\w{4})(\w{4})$/, "$1-$2-$3");
+document.getElementById("cartView").addEventListener("click", e => {
+  if (e.target.id === "gsBtn") gsEinloesen(document.getElementById("gsIn").value);
+  if (e.target.id === "gsDel"){ gsSet(null); render(); }
+});
+document.getElementById("cartView").addEventListener("keydown", e => { if (e.target.id === "gsIn" && e.key === "Enter"){ e.preventDefault(); gsEinloesen(e.target.value); } });
 function totals(){
   const sub = Object.entries(cart).reduce((s,[id,q]) => s + unitPrice(id)*q, 0);
   const voll = Object.entries(cart).reduce((s,[id,q]) => s + basePrice(id)*q, 0);
@@ -769,7 +792,8 @@ function totals(){
   const retEl = document.querySelector("[name=leergut]");
   const retN = Math.min(Math.max(parseInt(retEl && retEl.value) || 0, 0), pfandN);
   const refund = retN * CONFIG.pfand;
-  return {sub, voll, n, maxAge, pfandN, pfand, retN, refund, total: sub ? sub + CONFIG.fee + pfand - refund : 0};
+  const gs = GS && sub ? Math.min(Number(GS.rest) || 0, Math.round((sub + CONFIG.fee)*100)/100) : 0;
+  return {sub, voll, n, maxAge, pfandN, pfand, retN, refund, gs, total: sub ? Math.max(sub + CONFIG.fee + pfand - refund - gs, 0) : 0};
 }
 
 let LAST_ORDER = null;
@@ -822,8 +846,11 @@ function render(){
         <div><span>Lieferung</span><span>${CONFIG.fee ? eur(CONFIG.fee) : "gratis"}</span></div>
         ${t.pfandN ? `<div><span>Pfand (${t.pfandN} × ${eur(CONFIG.pfand)})</span><span>${eur(t.pfand)}</span></div>` : ""}
         ${t.retN ? `<div><span>Leergut-Rückgabe (${t.retN} ×)</span><span>− ${eur(t.refund)}</span></div>` : ""}
+        ${t.gs ? `<div style="color:var(--go);font-weight:700"><span>🎟️ Gutschein ${esc(gsFmt(GS.code))}</span><span>− ${eur(t.gs)}</span></div>` : ""}
         <div class="tot"><span>Gesamt</span><span>${eur(t.total)}</span></div>
-      </div>`;
+      </div>
+      <div class="gsbox">${GS ? `<span>🎟️ Gutschein <b>${esc(gsFmt(GS.code))}</b> aktiv · Guthaben ${eur(GS.rest)}${GS.rest > t.gs + 0.004 ? `, Rest ${eur(GS.rest - t.gs)} bleibt für später` : ""}</span><button type="button" id="gsDel">Entfernen</button>`
+        : `<details><summary>Gutscheincode einlösen</summary><div class="gsrow"><input id="gsIn" placeholder="z. B. AE-XXXX-XXXX" autocomplete="off" autocapitalize="characters"><button type="button" id="gsBtn">Einlösen</button></div><div id="gsMsg" class="q" role="status"></div></details>`}</div>`;
   }
   document.getElementById("send").disabled = !t.n || (!liveEvents().length && !preEvents().length);
   document.getElementById("send").textContent = isPre() ? "Vorbestellen und bezahlen" : sendLabel;
@@ -1105,11 +1132,12 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
       headers:{ ...(await authHeaders()), "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
         lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
-        zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar") } }) });
+        zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar"), code: GS ? GS.code : null } }) });
     const j = await r.json().catch(() => null);
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel;
       if (j.message.startsWith("NEUKUNDE:")){ const pay = f.pay; if (pay.querySelector('option[value="online"]')){ pay.value = "online"; render(); }
         return showErr(j.message.replace("NEUKUNDE:", "").trim() + (pay.value === "online" ? " Wir haben „Online zahlen“ schon für dich ausgewählt, tipp einfach nochmal auf Abschicken." : "")); }
+      if (/Gutschein/i.test(j.message)){ gsSet(null); render(); }
       return showErr(j.message); } else offline = true;
   }catch(x){ offline = true; }
   send.disabled = false; send.textContent = pre ? "Vorbestellen und bezahlen" : sendLabel;
@@ -1120,13 +1148,14 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     else localStorage.removeItem("ae_kunde");
   }catch(x){}
   kontoNachBestellung(f);
-  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
+  LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: !!srv.bezahlt, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
   if (srv.gutschein){ GIFT = null; try{ localStorage.removeItem("ae_gift"); }catch(x){} }
   try{ window.goatcounter && window.goatcounter.count && window.goatcounter.count({ path: LAST_ORDER.pre ? "vorbestellung" : "bestellung", title: (LAST_ORDER.pre ? "Vorbestellung " : "Bestellung ") + (LAST_ORDER.event || ""), event: true }); }catch(x){}
   cart = {}; render();
   document.getElementById("cartView").scrollIntoView({ block:"start" });
-  if (LAST_ORDER.online) zahlungStarten();
+  if (srv.gs_betrag) gsSet(null);
+  if (LAST_ORDER.online && !LAST_ORDER.bezahlt) zahlungStarten();
 });
 /* Online-Zahlung (SumUp) */
 const ZAHLUNG_URL = `${CONFIG.supabaseUrl}/functions/v1/zahlung`;

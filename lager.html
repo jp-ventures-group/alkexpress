@@ -46,6 +46,7 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .note{border-radius:10px;padding:12px;font-weight:500;margin-top:12px}
+.gsr{padding:12px 0;border-top:1px solid #DEDAF5}.gsr.off{opacity:.55}.gsc{font-family:ui-monospace,monospace;font-weight:800;font-size:18px;letter-spacing:.04em}.gsr .meta{font-size:14px;color:#5A5690}
 .csvbox{margin-top:14px;padding:12px;border-radius:12px;border:1.5px solid #CFCBEF;display:grid;gap:10px;font-size:15px;word-break:break-all}.csvbox span{color:var(--muted)}
 .note.ok{background:#DDF7EE;color:#0E5A42}
 .note.err{background:#FFE4E1;color:#8E1D14}
@@ -295,6 +296,21 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
       </form>
     </div>
 
+    <div class="card" id="gsCard">
+      <h2>Gutscheincodes</h2>
+      <p class="q" style="margin:0 0 10px;font-size:15px">Guthaben-Codes, z. B. fürs Gewinnspiel. Der Kunde gibt den Code im Warenkorb ein, der Betrag wird abgezogen. Restguthaben bleibt für die nächste Bestellung, bei Storno kommt es zurück.</p>
+      <form id="gsForm" style="display:grid;gap:12px">
+        <div class="f2"><label>Betrag (€) <input type="number" name="betrag" min="1" max="500" step="0.5" value="50" inputmode="decimal" required></label>
+          <label>Anzahl <input type="number" name="anzahl" min="1" max="100" value="3" inputmode="numeric" required></label></div>
+        <div class="f2"><label>Gültig bis <input type="date" name="bis" value="2027-03-31"></label>
+          <label>Notiz <input type="text" name="notiz" placeholder="z. B. Gewinnspiel Nov" maxlength="200"></label></div>
+        <button class="btn y sm" type="submit">Codes erstellen</button>
+        <div class="note hidden" id="gsMsg" role="status"></div>
+      </form>
+      <div id="gsNeu"></div>
+      <div id="gsList" style="margin-top:12px"></div>
+    </div>
+
     <div class="card">
       <h2>Export für Steuer &amp; Buchhaltung</h2>
       <p class="q" style="margin:0 0 10px;font-size:15px">CSV-Dateien für den oben gewählten Zeitraum, z. B. für die Steuerberatung oder dein Kassabuch.</p>
@@ -361,7 +377,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-04-konto";
+const APP_VERSION = "2026-11-04-gutschein";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -558,6 +574,7 @@ function preBadge(o){
   if (!o.vorbestellung) return "";
   return `<span class="badge" style="background:#FFF7E0;color:var(--ink);border:1px dashed #E0A800">📅 Vorbestellung${o.wunschzeit ? ` · ab ${fmtT(o.wunschzeit)}` : ""}</span>`;
 }
+function gsBadge(o){ return Number(o.gs_betrag) > 0 ? `<span class="badge" style="background:#FFF4D1;color:#7A4B00" title="Gutschein ${esc(gsFmt(o.gs_code))}">🎟️ −${eur(Number(o.gs_betrag))}</span>` : ""; }
 function kontoBadge(o){
   return o.konto === "verifiziert" ? '<span class="badge" style="background:#D1FADF;color:#067647" title="Kundenkonto, Ausweis wurde schon einmal geprüft">👤 verifiziert</span>'
     : o.konto === "konto" ? '<span class="badge" style="background:#EFEDFF;color:#1E1B4B" title="Kundenkonto, noch nicht verifiziert">👤 Konto</span>' : "";
@@ -587,7 +604,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -602,7 +619,7 @@ function orderDetail(o){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
-    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
     ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)} ${o.zahlart === "karte" ? "· 💳 mit Karte" : o.zahlart === "bar" ? "· 💵 bar" : ""}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
@@ -1430,7 +1447,40 @@ async function exportCsv(b){
   }
 }
 
+/* ================= Gutscheincodes ================= */
+const gsFmt = c => String(c || "").replace(/^(AE)(\w{4})(\w{4})$/, "$1-$2-$3");
+async function loadGutscheine(){
+  if (!isChef()){ $("gsCard").classList.add("hidden"); return; }
+  const { data, error } = await sb.rpc("gutscheine_lesen");
+  if (error){ $("gsList").innerHTML = `<p class="muted">Gutscheine konnten nicht geladen werden.</p>`; return; }
+  $("gsList").innerHTML = (data || []).length ? data.map(g => {
+    const leer = Number(g.rest) <= 0, abgel = g.gueltig_bis && new Date(g.gueltig_bis + "T23:59:59") < new Date();
+    const st = !g.aktiv ? "deaktiviert" : leer ? "aufgebraucht" : abgel ? "abgelaufen" : Number(g.rest) < Number(g.betrag) ? "teilweise eingelöst" : "offen";
+    return `<div class="gsr ${!g.aktiv || leer || abgel ? "off" : ""}"><div><div class="gsc">${esc(gsFmt(g.code))}</div>
+      <div class="meta">${eur(g.rest)} von ${eur(g.betrag)} · ${st}${g.gueltig_bis ? ` · bis ${new Date(g.gueltig_bis).toLocaleDateString("de-AT")}` : ""}${g.notiz ? ` · ${esc(g.notiz)}` : ""}</div>
+      ${(g.einloesungen || []).map(x => `<div class="meta">↳ #${esc(String(x.code || x.nr))} ${esc(x.name || "")}: −${eur(x.betrag)} (${STATUS[x.status] || esc(x.status)})</div>`).join("")}</div>
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn sm" data-gscopy="${esc(g.code)}">Kopieren</button><button type="button" class="btn o sm" data-gsakt="${esc(g.code)}" data-v="${g.aktiv ? 0 : 1}">${g.aktiv ? "Deaktivieren" : "Aktivieren"}</button></div></div>`;
+  }).join("") : `<p class="muted">Noch keine Gutscheincodes.</p>`;
+}
+$("gsForm").addEventListener("submit", async e => {
+  e.preventDefault(); const f = e.target, btn = f.querySelector("button"); btn.disabled = true;
+  const { data, error } = await sb.rpc("gutschein_erstellen", { p_betrag: Number(String(f.betrag.value).replace(",", ".")), p_anzahl: parseInt(f.anzahl.value), p_gueltig_bis: f.bis.value || null, p_notiz: f.notiz.value.trim() || null });
+  btn.disabled = false;
+  if (error) return note($("gsMsg"), "Fehler: " + error.message);
+  const codes = (data || []).map(gsFmt);
+  $("gsNeu").innerHTML = `<div class="note ok" style="margin-top:12px"><b>${codes.length} neue Codes à ${eur(Number(f.betrag.value))}:</b><pre style="margin:8px 0;font-size:16px;white-space:pre-wrap">${codes.join("\n")}</pre>
+    <button type="button" class="btn sm" data-gscopy="${esc(codes.join("\n"))}">Alle kopieren</button></div>`;
+  loadGutscheine();
+});
+document.addEventListener("click", async e => {
+  const c = e.target.closest("[data-gscopy]");
+  if (c){ const v = c.dataset.gscopy, txt = v.includes("\n") ? v : gsFmt(v);
+    try{ await navigator.clipboard.writeText(txt); toast("Kopiert."); }catch(x){ toast(txt, 8000); } return; }
+  const a = e.target.closest("[data-gsakt]");
+  if (a){ await sb.rpc("gutschein_aktiv", { p_code: a.dataset.gsakt, p_aktiv: a.dataset.v === "1" }); loadGutscheine(); }
+});
 async function loadSettings(){
+  loadGutscheine();
   const { data } = await sb.from("einstellungen").select("*").eq("id", 1).single();
   SET = data; if (!data) return;
   const f = $("setForm"); for (const k of ["firma","inhaber","adresse","uid","liefergebuehr"]) f[k].value = data[k] ?? ""; f.kleinunternehmer.checked = data.kleinunternehmer;

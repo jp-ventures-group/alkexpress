@@ -58,6 +58,7 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
         ${Number(b.liefergebuehr) ? `<tr><td>Liefergebühr</td><td class="n">${eur(b.liefergebuehr)}</td></tr>` : ""}
         ${Number(b.pfand) ? `<tr><td>Pfand (${pfStk} × Einweg)</td><td class="n">${eur(b.pfand)}</td></tr>` : ""}
         ${Number(b.pfand_retour) ? `<tr><td>Pfandrückgabe (${b.leergut_stk} Stück)</td><td class="n">− ${eur(b.pfand_retour)}</td></tr>` : ""}
+        ${Number(b.gutschein_betrag) ? `<tr><td>Gutschein eingelöst</td><td class="n">− ${eur(b.gutschein_betrag)}</td></tr>` : ""}
         <tr class="tot"><td>Gesamt</td><td class="n">${eur(b.gesamt)}</td></tr>
       </table>
       <div class="small">Bezahlt: ${b.zahlart === "karte" ? "Karte" : b.zahlart === "online" ? "online (SumUp)" : "bar"}</div>
