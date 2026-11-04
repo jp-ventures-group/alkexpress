@@ -403,7 +403,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-03-evlimit";
+const SITE_VERSION = "2026-11-04-gift1x";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -476,9 +476,17 @@ const store = {
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 };
 /* Gratis-Klopfer über die QR-Visitenkarte (?gift=klopfer) */
-let GIFT = null;
-try{ const g = new URLSearchParams(location.search).get("gift"); if (g === "klopfer") localStorage.setItem("ae_gift", JSON.stringify({ t: Date.now() }));
-  const v = JSON.parse(localStorage.getItem("ae_gift") || "null"); if (v && Date.now() - v.t < 30*864e5) GIFT = "karte"; }catch(e){}
+let GIFT = null, GIFT_BAR = false;
+try{ const qs = new URLSearchParams(location.search);
+  if (qs.get("gift") === "klopfer"){
+    const old = JSON.parse(localStorage.getItem("ae_gift") || "null");
+    // Neuer Scan startet die 30 Tage nur, wenn noch kein gültiger Gutschein da ist
+    if (!old || Date.now() - old.t >= 30*864e5) localStorage.setItem("ae_gift", JSON.stringify({ t: Date.now() }));
+    qs.delete("gift"); history.replaceState(null, "", location.pathname + (qs.toString() ? "?" + qs : "") + location.hash);
+  }
+  const v = JSON.parse(localStorage.getItem("ae_gift") || "null");
+  if (v && Date.now() - v.t < 30*864e5){ GIFT = "karte"; GIFT_BAR = !v.seen; if (!v.seen) localStorage.setItem("ae_gift", JSON.stringify({ ...v, seen: 1 })); }
+}catch(e){}
 let ALL = {};
 function buildAll(){ ALL = Object.fromEntries(CATALOG.flatMap(c => c.items.map(i => [i.id,{...i,age:i.age ?? c.age}]))); }
 buildAll();
@@ -1019,7 +1027,7 @@ document.addEventListener("click", e => {
 document.getElementById("legalClose").onclick = () => legalDlg.close();
 
 render();
-if (GIFT){ const gb = document.createElement("div"); gb.className = "giftbar"; gb.innerHTML = `🎁 <b>Gratis Kleiner Klopfer</b> zu deiner Bestellung – kommt automatisch dazu (ab 18).<button type="button" aria-label="Schließen">×</button>`;
+if (GIFT && GIFT_BAR){ const gb = document.createElement("div"); gb.className = "giftbar"; gb.innerHTML = `🎁 <b>Gratis Kleiner Klopfer</b> zu deiner Bestellung – kommt automatisch dazu (ab 18).<button type="button" aria-label="Schließen">×</button>`;
   document.body.appendChild(gb); gb.querySelector("button").onclick = () => gb.remove(); setTimeout(() => gb.classList.add("on"), 400); setTimeout(() => gb.remove(), 9000); }
 loadStock();
 loadEvents();
