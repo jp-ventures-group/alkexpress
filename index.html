@@ -426,7 +426,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-kontolink";
+const SITE_VERSION = "2026-11-04-nurlink";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -846,7 +846,7 @@ var SAVED_PAY = null;
   };
 })();
 
-/* ================= Kundenkonto (optional, Login mit E-Mail-Code) ================= */
+/* ================= Kundenkonto (optional, Login mit E-Mail-Link) ================= */
 const AUTH_URL = `${CONFIG.supabaseUrl}/auth/v1`;
 let AUTH = store.get("ae_auth"), KONTO = null, KONTO_MAIL = "";
 async function authFetch(path, body, token){
@@ -905,15 +905,15 @@ const STATUS_TXT = { eingegangen:"Eingegangen", bestaetigt:"Bestätigt", unterwe
 function acctView(v, msg){
   const b = document.getElementById("acctBody");
   if (v === "mail") b.innerHTML = `<h2>Anmelden</h2>
-    <p class="muted">Kein Passwort nötig: Wir schicken dir einen 6-stelligen Code per E-Mail. Ein Konto ist freiwillig, bestellen geht auch ohne.</p>
+    <p class="muted">Kein Passwort nötig: Wir schicken dir einen Anmelde-Link per E-Mail. Ein Konto ist freiwillig, bestellen geht auch ohne.</p>
     <form id="acctMail"><label>E-Mail<input type="email" name="email" autocomplete="email" required placeholder="du@beispiel.at" value="${esc(KONTO_MAIL || "")}"></label>
-    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Code senden</button></form>
+    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Anmelde-Link senden</button></form>
     <p class="muted" style="margin-top:14px">Mit der Anmeldung speichern wir deine E-Mail, Name, Handynummer, Geburtsdatum und deine Bestellungen, damit du schneller bestellen kannst. Du kannst dein Konto jederzeit löschen. Mehr in der <a href="#" data-legal="datenschutz">Datenschutzerklärung</a>.</p>`;
-  if (v === "code") b.innerHTML = `<h2>Code eingeben</h2>
-    <p class="muted">Wir haben dir eine E-Mail an <b>${esc(KONTO_MAIL)}</b> geschickt. Gib den Code ein oder tipp auf den Link in der Mail. Schau auch im Spam-Ordner nach.</p>
-    <form id="acctCode"><label>Code<input class="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="••••••"></label>
-    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Anmelden</button></form>
-    <div class="row"><button class="btn2" type="button" data-acct="mail">Andere E-Mail</button><button class="btn2" type="button" data-acct="resend">Code erneut senden</button></div>`;
+  if (v === "code") b.innerHTML = `<h2>Check deine Mails 📬</h2>
+    <p>Wir haben dir einen <b>Anmelde-Link</b> an <b>${esc(KONTO_MAIL)}</b> geschickt. Tipp in der Mail auf den Link, dann bist du angemeldet.</p>
+    <p class="muted">Keine Mail da? Schau im Spam-Ordner nach. Der Link ist eine Stunde gültig.</p>
+    <div class="msg" id="acctMsg">${msg || ""}</div>
+    <div class="row"><button class="btn2" type="button" data-acct="resend">Link erneut senden</button><button class="btn2" type="button" data-acct="mail">Andere E-Mail</button></div>`;
   if (v === "profil"){ const k = KONTO || {}, fix = !!k.verifiziert;
     b.innerHTML = `<h2>${KONTO ? "Meine Daten" : "Fast fertig"}</h2>
     <p class="muted">${KONTO ? "" : "Einmal eintragen, danach ist alles bei jeder Bestellung schon ausgefüllt."}${fix ? "Name und Geburtsdatum sind verifiziert (Ausweis geprüft) und können nicht mehr geändert werden." : ""}</p>
@@ -946,7 +946,7 @@ document.getElementById("acctDlg").addEventListener("submit", async e => {
   try{
     if (f.id === "acctMail"){ KONTO_MAIL = f.email.value.trim().toLowerCase();
       if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(KONTO_MAIL)) throw new Error("Bitte gib eine gültige E-Mail-Adresse ein.");
-      await codeSenden(); acctView("code"); setTimeout(() => document.querySelector("#acctCode input").focus(), 50); return; }
+      await codeSenden(); acctView("code"); return; }
     if (f.id === "acctCode"){
       const j = await authFetch("/verify", { type:"email", email: KONTO_MAIL, token: f.code.value.replace(/\D/g, "") });
       setAuth(j); await kontoLaden(); acctView(KONTO ? "home" : "profil"); return; }
@@ -956,8 +956,8 @@ document.getElementById("acctDlg").addEventListener("submit", async e => {
       KONTO = j.konto; KONTO_BEST = j.bestellungen || []; kontoUI(); kontoPrefill(); acctView("home"); return; }
   }catch(err){
     let m = err.message || String(err);
-    if (/expired|invalid|Token has expired/i.test(m)) m = "Der Code ist falsch oder abgelaufen. Fordere einen neuen an.";
-    if (/rate limit|security purposes|seconds/i.test(m)) m = "Bitte warte kurz, bevor du einen neuen Code anforderst.";
+    if (/expired|invalid|Token has expired/i.test(m)) m = "Der Link ist abgelaufen. Fordere einen neuen an.";
+    if (/rate limit|security purposes|seconds/i.test(m)) m = "Bitte warte kurz, bevor du einen neuen Link anforderst.";
     if (/Signups not allowed/i.test(m)) m = "Anmelden ist gerade noch nicht möglich. Du kannst trotzdem ganz normal bestellen.";
     setMsg(m);
   } finally { btn.disabled = false; }
@@ -980,7 +980,7 @@ document.getElementById("acctDlg").addEventListener("click", async e => {
   if (a === "mail") return acctView("mail");
   if (a === "profil") return acctView("profil");
   if (a === "home") return acctView("home");
-  if (a === "resend"){ try{ await codeSenden(); setMsg("Neuer Code ist unterwegs.", true); }catch(err){ setMsg(/seconds|rate/i.test(err.message) ? "Bitte warte kurz, bevor du einen neuen Code anforderst." : err.message); } return; }
+  if (a === "resend"){ try{ await codeSenden(); setMsg("Neuer Link ist unterwegs.", true); }catch(err){ setMsg(/seconds|rate/i.test(err.message) ? "Bitte warte kurz, bevor du einen neuen Link anforderst." : err.message); } return; }
   if (a === "logout"){ try{ await authFetch("/logout", {}, AUTH && AUTH.at); }catch(x){}
     setAuth(null); KONTO = null; KONTO_BEST = []; const f = document.getElementById("orderForm"); f.name.readOnly = false; f.dob.readOnly = false;
     kontoUI(); document.getElementById("acctDlg").close(); return; }
@@ -995,7 +995,7 @@ document.getElementById("acctDlg").addEventListener("click", async e => {
   const h = new URLSearchParams(location.hash.replace(/^#/, ""));
   if (!h.get("access_token") && !h.get("error_description")) return;
   history.replaceState(null, "", location.pathname + location.search);
-  if (h.get("error_description")){ acctView("mail", /expired|invalid/i.test(h.get("error_description")) ? "Der Link ist abgelaufen. Fordere einen neuen Code an." : h.get("error_description"));
+  if (h.get("error_description")){ acctView("mail", /expired|invalid/i.test(h.get("error_description")) ? "Der Link ist abgelaufen. Fordere einen neuen an." : h.get("error_description"));
     document.getElementById("acctDlg").showModal(); return; }
   setAuth({ access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: Number(h.get("expires_in")) || 3600 });
   try{ const r = await fetch(AUTH_URL + "/user", { headers:{ apikey: CONFIG.supabaseKey, Authorization:`Bearer ${AUTH.at}` } }); const u = await r.json(); if (u.email){ AUTH.email = u.email; store.set("ae_auth", AUTH); } }catch(e){}
