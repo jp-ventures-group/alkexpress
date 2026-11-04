@@ -793,7 +793,7 @@ function render(){
       ${ONLINE.aktiv && !payOnline() && !isPre() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
-        ${isPre() ? `<div><span>📅 Vorbestellung · online, ohne Rabatt</span><span></span></div>` : ""}
+        ${isPre() ? `<div><span>📅 Vorbestellung · online bezahlt</span><span></span></div>` : ""}
         ${payOnline() && t.voll > t.sub ? `<div><span>Online-Rabatt (${String(ONLINE.rabatt).replace(".", ",")} %)</span><span>− ${eur(t.voll - t.sub)}</span></div>` : ""}
         <div><span>Zwischensumme</span><span>${eur(t.sub)}</span></div>
         <div><span>Lieferung</span><span>${CONFIG.fee ? eur(CONFIG.fee) : "gratis"}</span></div>
