@@ -426,7 +426,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-konto";
+const SITE_VERSION = "2026-11-04-kontolink";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -910,7 +910,7 @@ function acctView(v, msg){
     <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Code senden</button></form>
     <p class="muted" style="margin-top:14px">Mit der Anmeldung speichern wir deine E-Mail, Name, Handynummer, Geburtsdatum und deine Bestellungen, damit du schneller bestellen kannst. Du kannst dein Konto jederzeit löschen. Mehr in der <a href="#" data-legal="datenschutz">Datenschutzerklärung</a>.</p>`;
   if (v === "code") b.innerHTML = `<h2>Code eingeben</h2>
-    <p class="muted">Wir haben dir einen Code an <b>${esc(KONTO_MAIL)}</b> geschickt. Schau auch im Spam-Ordner nach.</p>
+    <p class="muted">Wir haben dir eine E-Mail an <b>${esc(KONTO_MAIL)}</b> geschickt. Gib den Code ein oder tipp auf den Link in der Mail. Schau auch im Spam-Ordner nach.</p>
     <form id="acctCode"><label>Code<input class="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="••••••"></label>
     <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Anmelden</button></form>
     <div class="row"><button class="btn2" type="button" data-acct="mail">Andere E-Mail</button><button class="btn2" type="button" data-acct="resend">Code erneut senden</button></div>`;
@@ -940,7 +940,7 @@ document.getElementById("acctBtn").onclick = acctOpen;
 document.getElementById("acctX").onclick = () => document.getElementById("acctDlg").close();
 document.getElementById("acctHint").addEventListener("click", e => { if (e.target.closest("[data-acct=open]")) acctOpen(); });
 const setMsg = (t, ok) => { const m = document.getElementById("acctMsg"); if (m){ m.textContent = t; m.classList.toggle("ok", !!ok); } };
-async function codeSenden(){ await authFetch("/otp", { email: KONTO_MAIL, create_user: true }); }
+async function codeSenden(){ await authFetch("/otp?redirect_to=" + encodeURIComponent(location.origin + location.pathname), { email: KONTO_MAIL, create_user: true }); }
 document.getElementById("acctDlg").addEventListener("submit", async e => {
   e.preventDefault(); const f = e.target, btn = f.querySelector("button[type=submit]"); btn.disabled = true;
   try{
@@ -990,7 +990,18 @@ document.getElementById("acctDlg").addEventListener("click", async e => {
     catch(err){ alert(err.message); }
   }
 });
-kontoUI(); if (AUTH) kontoLaden();
+/* Anmeldung per Link aus der E-Mail: Token kommt im #-Teil der Adresse zurück */
+(async function(){
+  const h = new URLSearchParams(location.hash.replace(/^#/, ""));
+  if (!h.get("access_token") && !h.get("error_description")) return;
+  history.replaceState(null, "", location.pathname + location.search);
+  if (h.get("error_description")){ acctView("mail", /expired|invalid/i.test(h.get("error_description")) ? "Der Link ist abgelaufen. Fordere einen neuen Code an." : h.get("error_description"));
+    document.getElementById("acctDlg").showModal(); return; }
+  setAuth({ access_token: h.get("access_token"), refresh_token: h.get("refresh_token"), expires_in: Number(h.get("expires_in")) || 3600 });
+  try{ const r = await fetch(AUTH_URL + "/user", { headers:{ apikey: CONFIG.supabaseKey, Authorization:`Bearer ${AUTH.at}` } }); const u = await r.json(); if (u.email){ AUTH.email = u.email; store.set("ae_auth", AUTH); } }catch(e){}
+  await kontoLaden(); acctView(KONTO ? "home" : "profil"); document.getElementById("acctDlg").showModal();
+})();
+kontoUI(); if (AUTH && !/access_token/.test(location.hash)) kontoLaden();
 
 /* Geburtsdatum: TT.MM.JJJJ tippen, Punkte kommen automatisch */
 function parseDob(v){
