@@ -426,7 +426,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-nurlink";
+const SITE_VERSION = "2026-11-04-logoutlocal";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -981,7 +981,7 @@ document.getElementById("acctDlg").addEventListener("click", async e => {
   if (a === "profil") return acctView("profil");
   if (a === "home") return acctView("home");
   if (a === "resend"){ try{ await codeSenden(); setMsg("Neuer Link ist unterwegs.", true); }catch(err){ setMsg(/seconds|rate/i.test(err.message) ? "Bitte warte kurz, bevor du einen neuen Link anforderst." : err.message); } return; }
-  if (a === "logout"){ try{ await authFetch("/logout", {}, AUTH && AUTH.at); }catch(x){}
+  if (a === "logout"){ try{ await authFetch("/logout?scope=local", {}, AUTH && AUTH.at); }catch(x){}
     setAuth(null); KONTO = null; KONTO_BEST = []; const f = document.getElementById("orderForm"); f.name.readOnly = false; f.dob.readOnly = false;
     kontoUI(); document.getElementById("acctDlg").close(); return; }
   if (a === "del"){
