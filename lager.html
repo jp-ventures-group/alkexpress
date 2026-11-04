@@ -377,7 +377,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-04-gsstorno";
+const APP_VERSION = "2026-11-04-unbezahltaus";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -511,6 +511,8 @@ function applyRole(){
 }
 /* Admin in Lager-/Zusteller-Ansicht: sieht nur, was diese Rolle sehen würde */
 function sichtbar(o){
+  // Unbezahlte Online-Bestellungen (auch stornierte, nie bezahlte) sieht nur der Admin
+  if (!isChef() && unbezahlt(o)) return false;
   if (ROLE === REAL_ROLE || isChef()) return true;
   if (isLager()) return ["eingegangen","bestaetigt","unterwegs"].includes(o.status) || Date.now() - new Date(o.created_at) < 18*36e5;
   if (isZust()) return (["bestaetigt","unterwegs"].includes(o.status) && o.event_id === MY_EVENT && (!o.fahrer || o.fahrer === ME))
