@@ -225,6 +225,22 @@ textarea{min-height:76px;resize:vertical}
 
 dialog{border:0;border-radius:var(--r-lg);padding:28px 24px;max-width:min(440px,calc(100% - 32px));background:var(--paper);color:var(--ink)}
 dialog::backdrop{background:rgba(10,8,35,.85)}
+.hdr-r{display:flex;align-items:center;gap:8px}
+@media (max-width:440px){#acctLbl{display:none}.acct-btn{padding:8px 10px}.acct-btn.in::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#4FD6A8;margin-left:4px;vertical-align:2px}}
+.acct-btn{border:1.5px solid rgba(246,244,255,.35);background:none;color:var(--paper);border-radius:999px;padding:8px 12px;font-weight:700;cursor:pointer;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+dialog.acct{width:min(440px,calc(100% - 32px));max-height:calc(100dvh - 48px);overflow-y:auto;position:relative}
+dialog.acct .x{position:absolute;right:12px;top:10px;border:0;background:none;font-size:28px;cursor:pointer;color:var(--ink)}
+dialog.acct h2{font-size:30px;margin:0 0 8px}dialog.acct label{display:grid;gap:6px;margin:0 0 14px;font-weight:700}
+dialog.acct input{border:1.5px solid #CFCBEF;border-radius:12px;padding:12px;font:inherit;font-size:16px;width:100%;box-sizing:border-box}
+dialog.acct .code{font-size:28px;letter-spacing:.35em;text-align:center;font-weight:700}
+dialog.acct .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+dialog.acct .msg{min-height:20px;font-size:14px;margin:6px 0 10px;color:#B42318}dialog.acct .msg.ok{color:#067647}
+dialog.acct .muted{color:#5A5690;font-size:14px}
+.ord{border:1.5px solid #E2DFF7;border-radius:14px;padding:12px;margin:0 0 10px}.ord .t{display:flex;justify-content:space-between;gap:8px;font-weight:700}
+.ord .s{font-size:14px;color:#5A5690;margin:2px 0 8px}.ord .row{margin:0}.ord a,.ord button{font-size:14px;padding:8px 14px}
+.vbadge{display:inline-block;background:#D1FADF;color:#067647;border-radius:999px;padding:3px 10px;font-size:13px;font-weight:700}
+.acct-hint{font-size:14px;margin:0 0 12px;padding:10px 12px;border-radius:12px;background:#EFEDFF;color:var(--ink)}.acct-hint:empty{display:none}
+.acct-hint button{border:0;background:none;color:inherit;font-weight:700;text-decoration:underline;cursor:pointer;padding:0;font-size:14px}
 dialog h2{font-size:36px}
 dialog p{margin:0 0 18px}
 .row{display:flex;gap:10px;flex-wrap:wrap}
@@ -241,7 +257,8 @@ dialog p{margin:0 0 18px}
 <header>
   <div class="wrap bar">
     <a href="#" class="logo">Alk<b>Express</b></a>
-    <button class="cart-btn" id="openCart" aria-label="Warenkorb öffnen">Warenkorb <span class="n" id="count">0</span></button>
+    <div class="hdr-r"><button class="acct-btn" id="acctBtn" type="button" aria-label="Kundenkonto">👤 <span id="acctLbl">Anmelden</span></button>
+    <button class="cart-btn" id="openCart" aria-label="Warenkorb öffnen">Warenkorb <span class="n" id="count">0</span></button></div>
   </div>
   <a class="minibar" id="minibar" href="#events"><div class="wrap"><span class="dot"></span><b>Keine Lieferung</b><span id="miniSub"></span></div></a>
 </header>
@@ -355,6 +372,7 @@ dialog p{margin:0 0 18px}
   <div class="d-body">
     <div id="cartView"></div>
     <form id="orderForm" novalidate>
+      <div class="acct-hint" id="acctHint"></div>
       <div class="saved" id="savedBox" hidden><span id="savedTxt"></span><button type="button" id="forget">Nicht du?</button></div>
       <p class="reqnote"><b class="req">*</b> Pflichtfeld</p>
       <label><span>Name <b class="req" aria-hidden="true">*</b></span><input name="name" autocomplete="name" required></label>
@@ -396,6 +414,11 @@ dialog p{margin:0 0 18px}
   </div>
 </dialog>
 
+<dialog id="acctDlg" class="acct">
+  <button type="button" class="x" id="acctX" aria-label="Schließen">×</button>
+  <div id="acctBody"></div>
+</dialog>
+
 <dialog id="legalDlg" class="legal">
   <div id="legalBody"></div>
   <div class="row" style="margin-top:16px"><button class="btn1" id="legalClose">Schließen</button></div>
@@ -403,7 +426,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-04-preohne";
+const SITE_VERSION = "2026-11-04-konto";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -823,6 +846,152 @@ var SAVED_PAY = null;
   };
 })();
 
+/* ================= Kundenkonto (optional, Login mit E-Mail-Code) ================= */
+const AUTH_URL = `${CONFIG.supabaseUrl}/auth/v1`;
+let AUTH = store.get("ae_auth"), KONTO = null, KONTO_MAIL = "";
+async function authFetch(path, body, token){
+  const r = await fetch(AUTH_URL + path, { method:"POST", headers:{ apikey: CONFIG.supabaseKey, "Content-Type":"application/json", ...(token ? { Authorization:`Bearer ${token}` } : {}) }, body: JSON.stringify(body || {}) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.msg || j.error_description || j.message || "Fehler " + r.status);
+  return j;
+}
+function setAuth(j){ AUTH = j ? { at: j.access_token, rt: j.refresh_token, exp: Date.now() + (j.expires_in || 3600) * 1000, email: (j.user && j.user.email) || (AUTH && AUTH.email) || "" } : null;
+  if (AUTH) store.set("ae_auth", AUTH); else { try{ localStorage.removeItem("ae_auth"); }catch(e){} } }
+async function token(){
+  if (!AUTH) return null;
+  if (Date.now() < AUTH.exp - 60e3) return AUTH.at;
+  try{ setAuth(await authFetch("/token?grant_type=refresh_token", { refresh_token: AUTH.rt })); return AUTH.at; }
+  catch(e){ setAuth(null); KONTO = null; kontoUI(); return null; }
+}
+async function authHeaders(){ const t = await token(); return t ? { apikey: CONFIG.supabaseKey, Authorization:`Bearer ${t}` } : sbHeaders; }
+async function rpcAuth(fn, args){
+  const t = await token(); if (!t) throw new Error("Bitte melde dich erneut an.");
+  const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/${fn}`, { method:"POST", headers:{ apikey: CONFIG.supabaseKey, Authorization:`Bearer ${t}`, "Content-Type":"application/json" }, body: JSON.stringify(args || {}) });
+  const j = await r.json().catch(() => null);
+  if (!r.ok) throw new Error((j && j.message) || "Fehler " + r.status);
+  return j;
+}
+async function kontoLaden(){
+  if (!AUTH) return;
+  try{ const j = await rpcAuth("konto_lesen"); KONTO = j.konto; KONTO_MAIL = j.email || AUTH.email; KONTO_BEST = j.bestellungen || []; }
+  catch(e){ if (!AUTH) KONTO = null; }
+  kontoUI(); kontoPrefill();
+}
+let KONTO_BEST = [];
+function vorname(){ return KONTO && KONTO.name ? KONTO.name.split(" ")[0] : ""; }
+function kontoUI(){
+  document.getElementById("acctLbl").textContent = AUTH ? (vorname() || "Konto") : "Anmelden";
+  document.getElementById("acctBtn").classList.toggle("in", !!AUTH);
+  const h = document.getElementById("acctHint");
+  h.innerHTML = AUTH ? `👤 Angemeldet als <b>${esc(KONTO_MAIL || AUTH.email || "")}</b>${KONTO && KONTO.verifiziert ? ' <span class="vbadge">✓ verifiziert</span>' : ""} · <button type="button" data-acct="open">Konto</button>`
+    : `Schneller bestellen mit Kundenkonto: Daten auf jedem Handy, Bestellverlauf, „Nochmal bestellen“. <button type="button" data-acct="open">Anmelden</button> <span style="opacity:.7">(optional)</span>`;
+}
+function kontoPrefill(){
+  if (!KONTO) return;
+  const f = document.getElementById("orderForm");
+  if (KONTO.name) f.name.value = KONTO.name; if (KONTO.tel) f.phone.value = KONTO.tel;
+  if (KONTO.geburtsdatum) f.dob.value = KONTO.geburtsdatum.split("-").reverse().join(".");
+  if (KONTO.verifiziert){ f.name.readOnly = true; f.dob.readOnly = true; }
+  document.getElementById("savedBox").hidden = true;
+}
+async function kontoNachBestellung(f){
+  if (!AUTH) return;
+  const dob = parseDob(f.dob.value);
+  const neu = { name: f.name.value.trim(), tel: f.phone.value.trim(), geburtsdatum: dob };
+  if (KONTO && KONTO.name === neu.name && KONTO.tel === neu.tel && KONTO.geburtsdatum === neu.geburtsdatum) return;
+  try{ const j = await rpcAuth("konto_speichern", { p: neu }); KONTO = j.konto; KONTO_BEST = j.bestellungen || []; kontoUI(); }catch(e){}
+}
+const STATUS_TXT = { eingegangen:"Eingegangen", bestaetigt:"Bestätigt", unterwegs:"Unterwegs", geliefert:"Geliefert", storniert:"Storniert", abgelehnt:"Abgelehnt" };
+function acctView(v, msg){
+  const b = document.getElementById("acctBody");
+  if (v === "mail") b.innerHTML = `<h2>Anmelden</h2>
+    <p class="muted">Kein Passwort nötig: Wir schicken dir einen 6-stelligen Code per E-Mail. Ein Konto ist freiwillig, bestellen geht auch ohne.</p>
+    <form id="acctMail"><label>E-Mail<input type="email" name="email" autocomplete="email" required placeholder="du@beispiel.at" value="${esc(KONTO_MAIL || "")}"></label>
+    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Code senden</button></form>
+    <p class="muted" style="margin-top:14px">Mit der Anmeldung speichern wir deine E-Mail, Name, Handynummer, Geburtsdatum und deine Bestellungen, damit du schneller bestellen kannst. Du kannst dein Konto jederzeit löschen. Mehr in der <a href="#" data-legal="datenschutz">Datenschutzerklärung</a>.</p>`;
+  if (v === "code") b.innerHTML = `<h2>Code eingeben</h2>
+    <p class="muted">Wir haben dir einen Code an <b>${esc(KONTO_MAIL)}</b> geschickt. Schau auch im Spam-Ordner nach.</p>
+    <form id="acctCode"><label>Code<input class="code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" required placeholder="••••••"></label>
+    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Anmelden</button></form>
+    <div class="row"><button class="btn2" type="button" data-acct="mail">Andere E-Mail</button><button class="btn2" type="button" data-acct="resend">Code erneut senden</button></div>`;
+  if (v === "profil"){ const k = KONTO || {}, fix = !!k.verifiziert;
+    b.innerHTML = `<h2>${KONTO ? "Meine Daten" : "Fast fertig"}</h2>
+    <p class="muted">${KONTO ? "" : "Einmal eintragen, danach ist alles bei jeder Bestellung schon ausgefüllt."}${fix ? "Name und Geburtsdatum sind verifiziert (Ausweis geprüft) und können nicht mehr geändert werden." : ""}</p>
+    <form id="acctProfil"><label>Name<input name="name" autocomplete="name" required value="${esc(k.name || "")}" ${fix ? "readonly" : ""}></label>
+    <label>Handynummer<input name="tel" type="tel" autocomplete="tel" required value="${esc(k.tel || "")}"></label>
+    <label>Geburtsdatum<input name="dob" inputmode="numeric" placeholder="TT.MM.JJJJ" maxlength="10" required value="${k.geburtsdatum ? k.geburtsdatum.split("-").reverse().join(".") : ""}" ${fix ? "readonly" : ""}></label>
+    <div class="msg" id="acctMsg">${msg || ""}</div><button class="btn1" type="submit" style="width:100%">Speichern</button></form>
+    ${KONTO ? `<div class="row"><button class="btn2" type="button" data-acct="home">Zurück</button></div>` : ""}`; }
+  if (v === "home"){ const k = KONTO;
+    b.innerHTML = `<h2>Hallo${vorname() ? " " + esc(vorname()) : ""}!</h2>
+    <p class="muted" style="margin:0 0 6px">${esc(KONTO_MAIL)}</p>
+    <p style="margin:0 0 14px">${k && k.verifiziert ? '<span class="vbadge">✓ Verifiziert</span> Dein Ausweis wurde bei einer Lieferung geprüft.' : '<span class="muted">Nach deiner ersten Lieferung mit Ausweiskontrolle ist dein Konto verifiziert.</span>'}</p>
+    <div class="row" style="margin:0 0 18px"><button class="btn2" type="button" data-acct="profil">Meine Daten</button><button class="btn2" type="button" data-acct="logout">Abmelden</button></div>
+    <h3 style="margin:0 0 10px">Meine Bestellungen</h3>
+    ${KONTO_BEST.length ? KONTO_BEST.map(o => `<div class="ord"><div class="t"><span>#${esc(String(o.nr))} · ${esc(o.event_name || "")}</span><span>${eur(Number(o.gesamt))}</span></div>
+      <div class="s">${new Date(o.created_at).toLocaleDateString("de-AT")} · ${STATUS_TXT[o.status] || esc(o.status)}${o.vorbestellung ? " · Vorbestellung" : ""}</div>
+      <div class="s">${(o.posten || []).filter(p => Number(p.preis) > 0).map(p => `${p.menge}× ${esc(String(p.name).split(" · ")[0])}`).join(", ")}</div>
+      <div class="row">${o.token ? `<a class="btn2" style="text-decoration:none" href="status.html?id=${encodeURIComponent(o.id)}&t=${encodeURIComponent(o.token)}">Status</a>` : ""}<button class="btn1" type="button" data-again="${esc(o.id)}">Nochmal bestellen</button></div></div>`).join("")
+      : '<p class="muted">Noch keine Bestellungen mit diesem Konto.</p>'}
+    <p style="margin-top:18px"><button type="button" data-acct="del" style="border:0;background:none;color:#B42318;text-decoration:underline;cursor:pointer;padding:0;font-size:14px">Konto löschen</button></p>`; }
+}
+function acctOpen(){ const d = document.getElementById("acctDlg"); acctView(!AUTH ? "mail" : !KONTO ? "profil" : "home"); if (!d.open) d.showModal(); }
+document.getElementById("acctBtn").onclick = acctOpen;
+document.getElementById("acctX").onclick = () => document.getElementById("acctDlg").close();
+document.getElementById("acctHint").addEventListener("click", e => { if (e.target.closest("[data-acct=open]")) acctOpen(); });
+const setMsg = (t, ok) => { const m = document.getElementById("acctMsg"); if (m){ m.textContent = t; m.classList.toggle("ok", !!ok); } };
+async function codeSenden(){ await authFetch("/otp", { email: KONTO_MAIL, create_user: true }); }
+document.getElementById("acctDlg").addEventListener("submit", async e => {
+  e.preventDefault(); const f = e.target, btn = f.querySelector("button[type=submit]"); btn.disabled = true;
+  try{
+    if (f.id === "acctMail"){ KONTO_MAIL = f.email.value.trim().toLowerCase();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(KONTO_MAIL)) throw new Error("Bitte gib eine gültige E-Mail-Adresse ein.");
+      await codeSenden(); acctView("code"); setTimeout(() => document.querySelector("#acctCode input").focus(), 50); return; }
+    if (f.id === "acctCode"){
+      const j = await authFetch("/verify", { type:"email", email: KONTO_MAIL, token: f.code.value.replace(/\D/g, "") });
+      setAuth(j); await kontoLaden(); acctView(KONTO ? "home" : "profil"); return; }
+    if (f.id === "acctProfil"){
+      const dob = parseDob(f.dob.value); if (!dob) throw new Error("Bitte gib dein Geburtsdatum als TT.MM.JJJJ ein.");
+      const j = await rpcAuth("konto_speichern", { p: { name: f.name.value.trim(), tel: f.tel.value.trim(), geburtsdatum: dob } });
+      KONTO = j.konto; KONTO_BEST = j.bestellungen || []; kontoUI(); kontoPrefill(); acctView("home"); return; }
+  }catch(err){
+    let m = err.message || String(err);
+    if (/expired|invalid|Token has expired/i.test(m)) m = "Der Code ist falsch oder abgelaufen. Fordere einen neuen an.";
+    if (/rate limit|security purposes|seconds/i.test(m)) m = "Bitte warte kurz, bevor du einen neuen Code anforderst.";
+    if (/Signups not allowed/i.test(m)) m = "Anmelden ist gerade noch nicht möglich. Du kannst trotzdem ganz normal bestellen.";
+    setMsg(m);
+  } finally { btn.disabled = false; }
+});
+document.getElementById("acctDlg").addEventListener("input", e => {
+  if (e.target.name === "dob" && e.target.closest("#acctProfil") && !e.target.readOnly){
+    const d = e.target.value.replace(/\D/g, "").slice(0, 8); e.target.value = [d.slice(0,2), d.slice(2,4), d.slice(4)].filter(Boolean).join("."); }
+});
+document.getElementById("acctDlg").addEventListener("click", async e => {
+  const a = e.target.closest("[data-acct]")?.dataset.acct, again = e.target.closest("[data-again]")?.dataset.again;
+  if (again){
+    const o = KONTO_BEST.find(x => x.id === again); if (!o) return;
+    let n = 0; cart = {};
+    (o.posten || []).forEach(p => { if (Number(p.preis) > 0 && ALL[p.id] && (!STOCK || (STOCK[p.id] || 0) > 0)){ cart[p.id] = (cart[p.id] || 0) + p.menge; n++; } });
+    store.set("ae24_cart", cart); render(); document.getElementById("acctDlg").close();
+    if (n) document.getElementById("openCart").click(); else alert("Diese Produkte gibt es gerade leider nicht mehr.");
+    return;
+  }
+  if (!a) return;
+  if (a === "mail") return acctView("mail");
+  if (a === "profil") return acctView("profil");
+  if (a === "home") return acctView("home");
+  if (a === "resend"){ try{ await codeSenden(); setMsg("Neuer Code ist unterwegs.", true); }catch(err){ setMsg(/seconds|rate/i.test(err.message) ? "Bitte warte kurz, bevor du einen neuen Code anforderst." : err.message); } return; }
+  if (a === "logout"){ try{ await authFetch("/logout", {}, AUTH && AUTH.at); }catch(x){}
+    setAuth(null); KONTO = null; KONTO_BEST = []; const f = document.getElementById("orderForm"); f.name.readOnly = false; f.dob.readOnly = false;
+    kontoUI(); document.getElementById("acctDlg").close(); return; }
+  if (a === "del"){
+    if (!confirm("Konto wirklich löschen? Deine Kontodaten werden entfernt. Belege zu bisherigen Bestellungen müssen wir aus steuerlichen Gründen aufbewahren.")) return;
+    try{ await rpcAuth("konto_loeschen"); setAuth(null); KONTO = null; KONTO_BEST = []; kontoUI(); acctView("mail", ""); setMsg("Dein Konto wurde gelöscht.", true); }
+    catch(err){ alert(err.message); }
+  }
+});
+kontoUI(); if (AUTH) kontoLaden();
+
 /* Geburtsdatum: TT.MM.JJJJ tippen, Punkte kommen automatisch */
 function parseDob(v){
   const m = String(v).trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/); if (!m) return null;
@@ -922,7 +1091,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   let srv = null, offline = false;
   try{
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
-      headers:{ ...sbHeaders, "Content-Type":"application/json" },
+      headers:{ ...(await authHeaders()), "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
         lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
         zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar") } }) });
@@ -939,6 +1108,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     if (f.remember.checked) localStorage.setItem("ae_kunde", JSON.stringify({ name: f.name.value.trim(), phone: f.phone.value.trim(), dob: f.dob.value, pay: f.pay.value }));
     else localStorage.removeItem("ae_kunde");
   }catch(x){}
+  kontoNachBestellung(f);
   LAST_ORDER = { id: srv.id, code: srv.code || srv.nr, gesamt: Number(srv.gesamt), tel: f.phone.value.trim(), meet: f.meet.value.trim(), age: t.maxAge, online: srv.zahlart === "online", bezahlt: false, pre: !!srv.vorbestellung, event: srv.event || "", token: srv.token || "" };
   store.set("ae_last", { ...LAST_ORDER, t: Date.now() });
   if (srv.gutschein){ GIFT = null; try{ localStorage.removeItem("ae_gift"); }catch(x){} }
@@ -1021,6 +1191,7 @@ const LEGAL = {
     <p>Bestellung: Wir verarbeiten Name, Handynummer, Treffpunkt, Zahlungsart, deine bestellten Produkte und – nur wenn du ihn freigibst – deinen aktuellen Standort, um deine Bestellung abzuwickeln und dich bei der Lieferung zu erreichen (Art. 6 Abs. 1 lit. b DSGVO). Dein Geburtsdatum nutzen wir nur zur Altersprüfung im Bestellformular; es wird nicht in unserer Datenbank gespeichert. Das Alter prüfen wir zusätzlich bei der Übergabe per Ausweis.</p>
     <p>Speicherung und Kundenübersicht: Bestellungen speichern wir in unserer Datenbank (Auftragsverarbeiter: Supabase Inc., Datenbank-Hosting). Belegdaten bewahren wir wegen der gesetzlichen Aufbewahrungspflicht 7 Jahre auf (§ 132 BAO, Art. 6 Abs. 1 lit. c DSGVO). Intern fassen wir Bestellungen nach Handynummer zusammen, um zu sehen, was du bisher bestellt hast, Rückfragen schneller zu klären und unser Sortiment zu verbessern (berechtigtes Interesse, Art. 6 Abs. 1 lit. f DSGVO). Diese Übersicht sieht nur unser Team; wir geben deine Daten nicht weiter und verwenden sie nicht für Werbung. Du kannst dieser Auswertung jederzeit widersprechen – schreib uns einfach.</p>
     <p>Daten merken: Wenn du es auswählst, speichern wir Name, Handynummer, Geburtsdatum und Zahlungsart nur lokal in deinem Browser auf diesem Gerät, damit das Formular beim nächsten Mal ausgefüllt ist. Mit „Nicht du?“ löschst du sie jederzeit.</p>
+    <p>Kundenkonto (freiwillig): Wenn du dich mit deiner E-Mail anmeldest, speichern wir E-Mail, Name, Handynummer, Geburtsdatum, deine Bestellungen und ob dein Ausweis bei einer Lieferung geprüft wurde (Vertragserfüllung, Art. 6 Abs. 1 lit. b DSGVO). Den Anmeldecode verschicken wir über Resend (Resend Inc., Server in der EU). Du kannst dein Konto jederzeit selbst unter „Konto“ löschen; Belege zu Bestellungen bewahren wir wegen der gesetzlichen Aufbewahrungspflicht trotzdem 7 Jahre auf.</p>
     <p>Besucherstatistik: Wir zählen Seitenaufrufe mit GoatCounter, ohne Cookies und ohne persönliche Profile. Erfasst werden nur aufgerufene Seite, Herkunftsseite, Gerätetyp, Browser und Land; IP-Adressen werden nicht gespeichert (berechtigtes Interesse, Art. 6 Abs. 1 lit. f DSGVO).</p>
     <p>Feedback-Formular: Deinen Vorschlag und, falls angegeben, deinen Kontakt speichern wir, um das Sortiment zu verbessern und dir gegebenenfalls zu antworten (Art. 6 Abs. 1 lit. f DSGVO). Wir löschen Feedback spätestens nach 12 Monaten.</p>
     <p>Verantwortlich: ${I.name}, ${I.address}, ${I.email}. Du hast das Recht auf Auskunft, Berichtigung, Löschung und Beschwerde bei der Datenschutzbehörde.</p>`

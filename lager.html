@@ -361,7 +361,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-03-evpaused";
+const APP_VERSION = "2026-11-04-konto";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -558,6 +558,10 @@ function preBadge(o){
   if (!o.vorbestellung) return "";
   return `<span class="badge" style="background:#FFF7E0;color:var(--ink);border:1px dashed #E0A800">📅 Vorbestellung${o.wunschzeit ? ` · ab ${fmtT(o.wunschzeit)}` : ""}</span>`;
 }
+function kontoBadge(o){
+  return o.konto === "verifiziert" ? '<span class="badge" style="background:#D1FADF;color:#067647" title="Kundenkonto, Ausweis wurde schon einmal geprüft">👤 verifiziert</span>'
+    : o.konto === "konto" ? '<span class="badge" style="background:#EFEDFF;color:#1E1B4B" title="Kundenkonto, noch nicht verifiziert">👤 Konto</span>' : "";
+}
 function payBadge(o){
   if (o.zahlart === "bar") return '<span class="badge" style="background:#FFF4D1;color:var(--ink)">💵 bar</span>';
   if (o.zahlart === "karte") return '<span class="badge" style="background:#E3EAFF;color:var(--ink)">💳 Karte vor Ort</span>';
@@ -583,7 +587,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -598,7 +602,7 @@ function orderDetail(o){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
-    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
     ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)} ${o.zahlart === "karte" ? "· 💳 mit Karte" : o.zahlart === "bar" ? "· 💵 bar" : ""}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
