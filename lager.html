@@ -311,6 +311,22 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
       <div id="gsList" style="margin-top:12px"></div>
     </div>
 
+    <div class="card" id="crCard">
+      <h2>Creator</h2>
+      <p class="q" style="margin:0 0 10px;font-size:15px">Influencer bekommen einen eigenen Code. Kunden sparen den Rabatt, der Creator bekommt die Provision (vom Warenwert nach Rabatt) als Guthaben, sobald die Bestellung geliefert ist. Mit E-Mail wird das Kundenkonto verknüpft, dann sieht der Creator im Shop sein Dashboard.</p>
+      <form id="crForm" style="display:grid;gap:12px">
+        <div class="f2"><label>Name <input type="text" name="name" maxlength="80" required placeholder="Max Muster"></label>
+          <label>Code <input type="text" name="code" minlength="3" maxlength="20" required placeholder="MAX" autocapitalize="characters" style="text-transform:uppercase"></label></div>
+        <div class="f2"><label>E-Mail <input type="email" name="email" placeholder="für das Kundenkonto"></label>
+          <label>Handy <input type="tel" name="tel" placeholder="0660 1234567"></label></div>
+        <div class="f2"><label>Rabatt für Kunden (%) <input type="number" name="rabatt" min="0" max="50" step="0.5" value="5" inputmode="decimal" required></label>
+          <label>Provision (%) <input type="number" name="provision" min="0" max="50" step="0.5" value="5" inputmode="decimal" required></label></div>
+        <div class="btns"><button class="btn y sm" type="submit">Creator speichern</button><button class="btn o sm hidden" type="button" id="crNeu">Neu (Formular leeren)</button></div>
+        <div class="note hidden" id="crMsg" role="status"></div>
+      </form>
+      <div id="crList" style="margin-top:12px"></div>
+    </div>
+
     <div class="card">
       <h2>Export für Steuer &amp; Buchhaltung</h2>
       <p class="q" style="margin:0 0 10px;font-size:15px">CSV-Dateien für den oben gewählten Zeitraum, z. B. für die Steuerberatung oder dein Kassabuch.</p>
@@ -377,7 +393,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-04-unbezahltaus";
+const APP_VERSION = "2026-11-06-creator";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -576,6 +592,7 @@ function preBadge(o){
   if (!o.vorbestellung) return "";
   return `<span class="badge" style="background:#FFF7E0;color:var(--ink);border:1px dashed #E0A800">📅 Vorbestellung${o.wunschzeit ? ` · ab ${fmtT(o.wunschzeit)}` : ""}</span>`;
 }
+function crBadge(o){ return o.creator_code ? `<span class="badge" style="background:#FFF0B3;color:#7A4B00" title="Creator-Code ${esc(o.creator_code)}${Number(o.creator_provision) > 0 ? ` · Provision ${eur(Number(o.creator_provision))}${o.provision_gebucht ? " gebucht" : ""}` : ""}">⭐ ${esc(o.creator_code)}${Number(o.creator_rabatt) > 0 ? ` −${eur(Number(o.creator_rabatt))}` : ""}</span>` : ""; }
 function gsBadge(o){ return Number(o.gs_betrag) > 0 ? `<span class="badge" style="background:#FFF4D1;color:#7A4B00" title="Gutschein ${esc(gsFmt(o.gs_code))}">🎟️ −${eur(Number(o.gs_betrag))}</span>` : ""; }
 function kontoBadge(o){
   return o.konto === "verifiziert" ? '<span class="badge" style="background:#D1FADF;color:#067647" title="Kundenkonto, Ausweis wurde schon einmal geprüft">👤 verifiziert</span>'
@@ -606,7 +623,7 @@ function waBtn(o, label, text){
 }
 function orderRow(o){
   return `<div class="ord ${o.status==="eingegangen"?"new":""}" data-open="${o.id}" role="button" tabindex="0">
-    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
+    <div class="t">#${oc(o)} ${esc(o.kunde_name)}${istTest(o) ? '<span class="badge" style="background:#B9B5E6;color:var(--ink)">ÜBUNG</span>' : ""}<span class="badge st-${o.status}">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${crBadge(o)}${ageBadge(o)}${packBadge(o)}</div>
     <div class="a">${eur(o.gesamt)}</div>
     <div class="s">${fmtT(o.created_at)} · ${esc(o.event_name||"")} · ${esc(o.treffpunkt||"")}</div>
     <div class="s" style="text-align:right">${o.posten.reduce((s,p)=>s+p.menge,0)} Stk.</div></div>`;
@@ -621,7 +638,7 @@ function orderDetail(o){
     <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
       <h2 style="margin:0">#${oc(o)} ${esc(o.kunde_name)}</h2>
       <button class="btn o sm" data-close="1">Schließen</button></div>
-    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
+    <p style="margin:6px 0 0"><span class="badge st-${o.status}" style="margin-left:0">${STATUS[o.status]}</span>${preBadge(o)}${payBadge(o)}${kontoBadge(o)}${gsBadge(o)}${crBadge(o)}${o.max_alter?`<span class="badge age">Ausweis ab ${o.max_alter}</span>`:""}${o.bearbeitet_von?` <small>· ${esc(o.bearbeitet_von)}</small>`:""}</p>
     ${onl(o) && !done ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:${o.bezahlt ? "#DDF7EE" : "#FFE3E0"};font-weight:800;font-size:18px">${o.bezahlt ? `✅ Online bezahlt (${eur(o.gesamt)}) – nichts kassieren` : `⏳ Wartet auf Online-Zahlung (${eur(o.gesamt)})<div style="font-weight:500;font-size:13px">Erst annehmen, wenn bezahlt. Ohne Zahlung wird sie nach 30–40 Min. automatisch storniert.</div><button type="button" class="btn o sm" data-paycheck="${o.id}" style="margin-top:6px">Zahlung prüfen</button>`}</div>` : ""}
     ${!isChef() && !done && !onl(o) ? `<div style="margin:10px 0 0;padding:10px 14px;border-radius:14px;background:#FFF4D1;font-weight:800;font-size:20px">Zu kassieren: ${eur(o.gesamt)} ${o.zahlart === "karte" ? "· 💳 mit Karte" : o.zahlart === "bar" ? "· 💵 bar" : ""}${o.pfand>0?` <small style="font-weight:600;font-size:13px">(inkl. ${eur(o.pfand)} Pfand, Leergut wird abgezogen)</small>`:""}</div>` : ""}
     ${o.vorbestellung ? `<p style="margin:8px 0 0;padding:8px 12px;border-radius:12px;background:#FFF7E0"><b>📅 Vorbestellung</b> für ${esc(o.event_name||"")}${o.wunschzeit ? ` · Wunschzeit ab <b>${fmtDT(o.wunschzeit)}</b>` : " · so früh wie möglich"}. Standort noch nicht geprüft – am Abend anrufen und Treffpunkt klären.</p>` : ""}
@@ -1481,8 +1498,53 @@ document.addEventListener("click", async e => {
   const a = e.target.closest("[data-gsakt]");
   if (a){ await sb.rpc("gutschein_aktiv", { p_code: a.dataset.gsakt, p_aktiv: a.dataset.v === "1" }); loadGutscheine(); }
 });
+/* ================= Creator-Codes ================= */
+let CREATORS = [];
+const crShare = c => "https://alkexpress.at/?c=" + encodeURIComponent(c);
+const pct = n => String(Number(n)).replace(".", ",") + " %";
+async function loadCreators(){
+  if (!isChef()){ $("crCard").classList.add("hidden"); return; }
+  const { data, error } = await sb.rpc("creators_lesen");
+  if (error){ $("crList").innerHTML = `<p class="muted">Creator konnten nicht geladen werden.</p>`; return; }
+  CREATORS = data || [];
+  $("crList").innerHTML = CREATORS.length ? CREATORS.map(c => `<div class="gsr ${c.aktiv ? "" : "off"}">
+      <div class="gsc">⭐ ${esc(c.code)}</div><div style="font-weight:700">${esc(c.name)}${c.aktiv ? "" : ' <span class="meta">· deaktiviert</span>'}</div>
+      <div class="meta">Rabatt ${pct(c.rabatt_pct)} · Provision ${pct(c.provision_pct)} · Konto ${c.konto ? "✓ verknüpft" : "✗ nicht verknüpft"}${c.email ? ` · ${esc(c.email)}` : ""}${c.tel ? ` · ${esc(c.tel)}` : ""}</div>
+      <div class="meta"><b>${Number(c.bestellungen) || 0}</b> Bestellungen · Umsatz ${eur(Number(c.umsatz) || 0)} · Provision ${eur(Number(c.provision_gesamt) || 0)}${Number(c.offen) > 0 ? ` (+ ${eur(Number(c.offen))} offen)` : ""} · Guthaben ${eur(Number(c.guthaben) || 0)}${c.guthaben_code ? ` (${esc(gsFmt(c.guthaben_code))})` : ""}</div>
+      <div class="btns" style="margin-top:8px"><button type="button" class="btn sm" data-crlink="${esc(c.code)}">Teilen-Link kopieren</button><button type="button" class="btn o sm" data-credit="${esc(c.code)}">Bearbeiten</button><button type="button" class="btn o sm" data-crakt="${esc(c.code)}">${c.aktiv ? "Deaktivieren" : "Aktivieren"}</button></div></div>`).join("")
+    : `<p class="muted">Noch keine Creator.</p>`;
+}
+async function crSpeichern(p){
+  const { data, error } = await sb.rpc("creator_speichern", { p });
+  if (error){ note($("crMsg"), "Fehler: " + error.message); return null; }
+  return data;
+}
+$("crForm").addEventListener("submit", async e => {
+  e.preventDefault(); const f = e.target, btn = f.querySelector("button[type=submit]"); btn.disabled = true;
+  const alt = CREATORS.find(c => c.code === f.code.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ""));
+  const num = v => Number(String(v).replace(",", "."));
+  const j = await crSpeichern({ code: f.code.value.trim(), name: f.name.value.trim(), email: f.email.value.trim() || null, tel: f.tel.value.trim() || null,
+    rabatt_pct: num(f.rabatt.value), provision_pct: num(f.provision.value), aktiv: alt ? alt.aktiv : true });
+  btn.disabled = false; if (!j) return;
+  note($("crMsg"), `Creator ${j.code} gespeichert.${j.konto_verknuepft ? " Kundenkonto ist verknüpft." : f.email.value.trim() ? " Noch kein Kundenkonto mit dieser E-Mail – wird verknüpft, sobald sich der Creator im Shop anmeldet." : ""} Link: ${crShare(j.code)}`, true);
+  f.reset(); $("crNeu").classList.add("hidden"); f.code.readOnly = false; loadCreators();
+});
+$("crNeu").onclick = () => { const f = $("crForm"); f.reset(); f.code.readOnly = false; $("crNeu").classList.add("hidden"); };
+document.addEventListener("click", async e => {
+  const l = e.target.closest("[data-crlink]");
+  if (l){ const u = crShare(l.dataset.crlink); try{ await navigator.clipboard.writeText(u); toast("Link kopiert: " + u); }catch(x){ toast(u, 8000); } return; }
+  const ed = e.target.closest("[data-credit]");
+  if (ed){ const c = CREATORS.find(x => x.code === ed.dataset.credit), f = $("crForm"); if (!c) return;
+    f.name.value = c.name || ""; f.code.value = c.code; f.code.readOnly = true; f.email.value = c.email || ""; f.tel.value = c.tel || "";
+    f.rabatt.value = c.rabatt_pct; f.provision.value = c.provision_pct; $("crNeu").classList.remove("hidden");
+    f.scrollIntoView({ block:"center", behavior:"smooth" }); return; }
+  const a = e.target.closest("[data-crakt]");
+  if (a){ const c = CREATORS.find(x => x.code === a.dataset.crakt); if (!c) return; a.disabled = true;
+    const j = await crSpeichern({ code: c.code, name: c.name, email: c.email, tel: c.tel, rabatt_pct: c.rabatt_pct, provision_pct: c.provision_pct, aktiv: !c.aktiv });
+    if (j) toast(`${c.code} ${c.aktiv ? "deaktiviert" : "aktiviert"}.`); loadCreators(); }
+});
 async function loadSettings(){
-  loadGutscheine();
+  loadGutscheine(); loadCreators();
   const { data } = await sb.from("einstellungen").select("*").eq("id", 1).single();
   SET = data; if (!data) return;
   const f = $("setForm"); for (const k of ["firma","inhaber","adresse","uid","liefergebuehr"]) f[k].value = data[k] ?? ""; f.kleinunternehmer.checked = data.kleinunternehmer;

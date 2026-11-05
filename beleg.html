@@ -44,7 +44,9 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
     const b = await r.json();
     if (!r.ok || !b) throw new Error();
     const pfStk = b.posten.reduce((s,p)=>s+p.menge*p.pfand_stk,0);
-    const rates = {}; b.posten.forEach(p => rates[p.ust] = (rates[p.ust]||0) + p.menge*p.preis); rates[20] = (rates[20]||0) + Number(b.liefergebuehr);
+    const crr = Number(b.creator_rabatt) || 0, wsum = b.posten.reduce((s,p)=>s+p.menge*p.preis,0);
+    const crf = crr && wsum ? (wsum - crr) / wsum : 1; // Creator-Rabatt mindert die Bemessungsgrundlage anteilig
+    const rates = {}; b.posten.forEach(p => rates[p.ust] = (rates[p.ust]||0) + p.menge*p.preis*crf); rates[20] = (rates[20]||0) + Number(b.liefergebuehr);
     const ust = Object.keys(rates).sort((a,c)=>c-a).map(k => { const g = rates[k], n = g/(1+k/100); return `${k} % USt: ${eur(g-n)} (netto ${eur(n)})`; });
     const bn = Number(b.beleg_nr) < 0 ? `Ü-${-Number(b.beleg_nr)}` : b.beleg_nr;
     document.title = `AlkExpress Beleg Nr. ${bn}`;
@@ -55,6 +57,7 @@ const esc = t => String(t ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt
       <div class="small">${new Date(b.beleg_am).toLocaleString("de-AT")} · ${esc(b.event||"")}</div>
       <table>
         ${b.posten.map(p => `<tr><td>${p.menge} × ${esc(p.name)}<div class="small">à ${eur(p.preis)}</div></td><td class="n">${eur(p.menge*p.preis)}</td></tr>`).join("")}
+        ${crr ? `<tr><td>Creator-Rabatt (${esc(b.creator_code || "")})</td><td class="n">− ${eur(crr)}</td></tr>` : ""}
         ${Number(b.liefergebuehr) ? `<tr><td>Liefergebühr</td><td class="n">${eur(b.liefergebuehr)}</td></tr>` : ""}
         ${Number(b.pfand) ? `<tr><td>Pfand (${pfStk} × Einweg)</td><td class="n">${eur(b.pfand)}</td></tr>` : ""}
         ${Number(b.pfand_retour) ? `<tr><td>Pfandrückgabe (${b.leergut_stk} Stück)</td><td class="n">− ${eur(b.pfand_retour)}</td></tr>` : ""}
