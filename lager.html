@@ -228,6 +228,7 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
           <label>Zusteller gebraucht <input type="number" name="bf" min="0" max="30" value="0" inputmode="numeric"></label>
           <label>Lager gebraucht <input type="number" name="bl" min="0" max="30" value="0" inputmode="numeric"></label>
         </div>
+        <label>Rabatt auf alles (%) <small>z. B. 20 zur Eröffnung, ersetzt den Online-Rabatt</small><input type="number" name="rab" min="0" max="50" step="1" value="0" inputmode="numeric"></label>
         <p class="muted" style="margin:-4px 0 0;font-size:13px">0 bei beiden = keine Planung, jeder kann am Abend einchecken. Sonst können nur Eingeteilte einchecken.</p>
         <label>Position der Location <small>Google-Maps-Link oder Koordinaten einfügen, oder vor Ort Standort übernehmen</small>
           <input type="text" name="pos" placeholder="z. B. 47.0667, 15.4296" required></label>
@@ -402,7 +403,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-06-pakete";
+const APP_VERSION = "2026-11-06-eventrabatt";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1275,7 +1276,7 @@ function evRow(e, now){
   const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), live = e.aktiv && a <= now && now < b, past = b <= now;
   const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
   return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
-    <div><div class="nm">${esc(e.name)} <span class="arttag">${esc(evArt(e))}</span></div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div>${planHtml(e, past)}</div>
+    <div><div class="nm">${esc(e.name)} <span class="arttag">${esc(evArt(e))}</span></div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}${Number(e.rabatt_pct) ? ` · <b style="color:#FFC83D">−${e.rabatt_pct} % auf alles</b>` : ""}</div>${planHtml(e, past)}</div>
     <div class="acts"><button type="button" data-ev="edit" data-id="${e.id}">✎</button><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
       <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button></div></div>`;
 }
@@ -1343,14 +1344,14 @@ function evEdit(ev){
   EV_EDIT = ev.id;
   f.name.value = ev.name; f.ort.value = ev.ort; f.art.value = evArt(ev); f.tag.value = isoDay(a); f.von.value = hhmm(a); f.bis.value = hhmm(b);
   if (![...f.radius.options].some(o => o.value === String(ev.radius_m))) f.radius.add(new Option(`${ev.radius_m} m`, ev.radius_m));
-  f.radius.value = String(ev.radius_m); f.bf.value = ev.bedarf_fahrer || 0; f.bl.value = ev.bedarf_lager || 0;
+  f.radius.value = String(ev.radius_m); f.bf.value = ev.bedarf_fahrer || 0; f.bl.value = ev.bedarf_lager || 0; f.rab.value = ev.rabatt_pct || 0;
   f.pos.value = `${Number(ev.lat).toFixed(6)}, ${Number(ev.lng).toFixed(6)}`; $("posInfo").textContent = `Erkannt: ${Number(ev.lat).toFixed(5)}, ${Number(ev.lng).toFixed(5)}`;
   $("evHead").textContent = `„${ev.name}“ bearbeiten`; $("evSubmit").textContent = "Änderungen speichern"; $("evCancel").classList.remove("hidden");
   $("evHead").scrollIntoView({ behavior:"smooth", block:"start" });
 }
 function evReset(){
   const f = $("evForm"); EV_EDIT = null;
-  f.name.value = ""; f.ort.value = ""; f.art.value = "Maturaball"; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; f.bf.value = 0; f.bl.value = 0; $("posInfo").textContent = "";
+  f.name.value = ""; f.ort.value = ""; f.art.value = "Maturaball"; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; f.bf.value = 0; f.bl.value = 0; f.rab.value = 0; $("posInfo").textContent = "";
   $("evHead").textContent = "Event hinzufügen"; $("evSubmit").textContent = "Event speichern"; $("evCancel").classList.add("hidden");
 }
 $("evCancel").onclick = evReset;
@@ -1375,7 +1376,7 @@ $("evForm").addEventListener("submit", async e => {
   const von = new Date(`${f.tag.value}T${f.von.value}`), bis = new Date(`${f.tag.value}T${f.bis.value}`);
   if (bis <= von) bis.setDate(bis.getDate() + 1);
   const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), art: f.art.value, lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString(),
-    bedarf_fahrer: Math.min(Math.max(parseInt(f.bf.value) || 0, 0), 30), bedarf_lager: Math.min(Math.max(parseInt(f.bl.value) || 0, 0), 30) };
+    bedarf_fahrer: Math.min(Math.max(parseInt(f.bf.value) || 0, 0), 30), bedarf_lager: Math.min(Math.max(parseInt(f.bl.value) || 0, 0), 30), rabatt_pct: Math.min(Math.max(parseInt(f.rab.value) || 0, 0), 50) };
   const edit = EV_EDIT;
   const { error } = edit ? await sb.from("events").update(row).eq("id", edit) : await sb.from("events").insert(row);
   if (error) return note($("evMsg"), "Speichern fehlgeschlagen: " + error.message);

@@ -433,7 +433,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-pakete";
+const SITE_VERSION = "2026-11-06-eventrabatt";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -651,7 +651,7 @@ function renderEvents(){
   st.classList.toggle("live", live.length > 0);
   if (live.length){
     document.getElementById("statusTitle").textContent = live.length === 1 ? `Jetzt live: ${live[0].name}` : `Jetzt live bei ${live.length} Events`;
-    document.getElementById("statusSub").textContent = live.map(e => `${e.ort}, bis ${fmtTime(new Date(e.liefer_bis))} Uhr`).join(" · ");
+    document.getElementById("statusSub").textContent = live.map(e => `${e.ort}, bis ${fmtTime(new Date(e.liefer_bis))} Uhr${Number(e.rabatt_pct) ? ` · −${pctTxt(e.rabatt_pct)} % auf alles` : ""}`).join(" · ");
   } else if (upcoming.length){
     const n = upcoming[0], d = new Date(n.liefer_von);
     document.getElementById("statusTitle").textContent = "Gerade keine Lieferung";
@@ -669,14 +669,14 @@ function renderEvents(){
   list.innerHTML = EVENTS.length ? shown.map(e => {
     const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), isLive = a <= now && now < b;
     return `<li><div class="d">${fmtDay(a)}<small>${fmtTime(a)}–${fmtTime(b)}</small></div>
-      <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}</div>
+      <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}${Number(e.rabatt_pct) ? ` <span class="live">· −${pctTxt(e.rabatt_pct)} % auf alles</span>` : ""}</div>
       <div class="o">Vor ${esc(e.ort)} · Übergabe draußen im Umkreis von ${e.radius_m} m</div>${!isLive && ONLINE.aktiv ? `<button type="button" class="pre-btn" data-pre="${e.id}">Jetzt vorbestellen</button>` : ""}</li>`;
   }).join("") : `<li class="empty-ev">Gerade sind keine Events geplant. Folg uns auf Instagram, dann verpasst du das nächste nicht.</li>`;
   const sel = document.querySelector("[name=event]"), prev = sel.value;
   const pre = preEvents(now);
   sel.innerHTML = (live.length || pre.length)
-    ? live.map(e => `<option value="${e.id}">${esc(e.name)} (${esc(e.ort)}) · jetzt</option>`).join("")
-      + pre.map(e => { const a = new Date(e.liefer_von); return `<option value="${e.id}">Vorbestellen: ${esc(e.name)} · ${fmtDay(a)} ab ${fmtTime(a)}</option>`; }).join("")
+    ? live.map(e => `<option value="${e.id}">${esc(e.name)} (${esc(e.ort)}) · jetzt${Number(e.rabatt_pct) ? ` · −${pctTxt(e.rabatt_pct)} %` : ""}</option>`).join("")
+      + pre.map(e => { const a = new Date(e.liefer_von); return `<option value="${e.id}">Vorbestellen: ${esc(e.name)} · ${fmtDay(a)} ab ${fmtTime(a)}${Number(e.rabatt_pct) ? ` · −${pctTxt(e.rabatt_pct)} %` : ""}</option>`; }).join("")
     : `<option value="">Gerade keine Lieferung</option>`;
   if ([...live, ...pre].some(e => e.id === prev)) sel.value = prev;
   if (!live.length && pre.length && ONLINE.aktiv){ const st2 = document.getElementById("statusSub"); if (!st2.textContent.includes("vorbestellen")) st2.textContent += " · Jetzt schon vorbestellen!"; }
@@ -763,10 +763,14 @@ function basePrice(id){ const p = ALL[id].price; return SHOT_IDS.includes(id) &&
 /* Bei Vorbestellungen gibt es keinen Online-Rabatt, daher auch kein "−10 %" im Text */
 function payLabel(){
   const o = document.querySelector('[name=pay] option[value="online"]'); if (!o) return;
-  o.textContent = isPre() ? "Online zahlen (Karte, Apple Pay)"
+  o.textContent = isPre() || evRab() ? "Online zahlen (Karte, Apple Pay)"
     : `Online zahlen${ONLINE.rabatt ? ` −${String(ONLINE.rabatt).replace(".", ",")} %` : ""} (Karte, Apple Pay)`;
 }
-function unitPrice(id){ const b = basePrice(id); return payOnline() && !isPre() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
+/* Event-Rabatt (z. B. Eröffnung −20 %) gilt für alle Zahlarten und ersetzt den Online-Rabatt – wie in der Datenbank */
+function evRab(){ const e = selEvent(); return e ? Math.min(Number(e.rabatt_pct) || 0, 50) : 0; }
+function unitPrice(id){ const b = basePrice(id), er = evRab();
+  if (er) return Math.round(b*(1-er/100)*100)/100;
+  return payOnline() && !isPre() ? Math.round(b*(1-ONLINE.rabatt/100)*100)/100 : b; }
 async function loadOnline(){
   try{
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/einstellungen?select=online_aktiv,online_rabatt&id=eq.1`, { headers: sbHeaders, cache:"no-store" });
@@ -897,11 +901,11 @@ function render(){
       `<li><span><span class="q">${q} ×</span> ${ALL[id].name} <span class="q">(${ALL[id].size})</span></span><span>${eur(unitPrice(id)*q)}</span></li>`).join("")}</ul>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px"><button type="button" id="addMore" style="border:1.5px solid currentColor;background:none;color:inherit;border-radius:999px;padding:8px 14px;font:inherit;font-weight:700;font-size:14px;cursor:pointer">+ Drinks hinzufügen</button><button type="button" id="clearCart" style="background:none;border:0;color:#6B6799;font:inherit;font-size:14px;text-decoration:underline;cursor:pointer;padding:6px 0">Warenkorb leeren</button></div>
       ${GIFT && ALL.m4 ? `<p class="q" style="margin:6px 0 0;color:var(--go);font-weight:700">🎁 + 1 Kleiner Klopfer gratis (QR-Karte, ab 18) – kommt automatisch dazu</p>` : ""}
-      ${ONLINE.aktiv && !payOnline() && !isPre() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
+      ${ONLINE.aktiv && !payOnline() && !isPre() && !evRab() && ONLINE.rabatt ? `<p class="q" style="margin:6px 0 0">💳 Tipp: Mit „Online zahlen“ sparst du ${String(ONLINE.rabatt).replace(".", ",")} % (${eur(t.voll*ONLINE.rabatt/100)}).</p>` : ""}
       ${shotCount() >= SHOT_MIN ? `<p class="q" style="margin:6px 0 0">🎉 Mengenrabatt: 10 % auf ${shotCount()} Shots</p>` : shotCount() ? `<p class="q" style="margin:6px 0 0">Noch ${SHOT_MIN - shotCount()} Shots, dann 10 % Rabatt auf alle Shots.</p>` : ""}
       <div class="sum">
         ${isPre() ? `<div><span>📅 Vorbestellung · online bezahlt</span><span></span></div>` : ""}
-        ${payOnline() && t.voll > t.sub ? `<div><span>Online-Rabatt (${String(ONLINE.rabatt).replace(".", ",")} %)</span><span>− ${eur(t.voll - t.sub)}</span></div>` : ""}
+        ${(evRab() || payOnline()) && t.voll > t.sub ? `<div style="${evRab() ? "color:var(--go);font-weight:700" : ""}"><span>${evRab() ? `🎉 Event-Rabatt (${pctTxt(evRab())} %)` : `Online-Rabatt (${String(ONLINE.rabatt).replace(".", ",")} %)`}</span><span>− ${eur(t.voll - t.sub)}</span></div>` : ""}
         ${t.cr ? `<div style="color:var(--go);font-weight:700"><span>⭐ Creator-Rabatt (${esc(CR.code)})</span><span>− ${eur(t.cr)}</span></div>` : ""}
         <div><span>Zwischensumme</span><span>${eur(t.sub - t.cr)}</span></div>
         <div><span>Lieferung</span><span>${CONFIG.fee ? eur(CONFIG.fee) : "gratis"}</span></div>
