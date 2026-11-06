@@ -403,7 +403,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-06-eventrabatt";
+const APP_VERSION = "2026-11-06-reiter";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -521,7 +521,9 @@ function alertNew(o){
   try{ const c = new (window.AudioContext||window.webkitAudioContext)(), g = c.createGain(), osc = c.createOscillator();
     osc.frequency.value = 880; osc.connect(g); g.connect(c.destination); g.gain.value = .15; osc.start(); osc.stop(c.currentTime + .25); }catch(e){}
 }
-$("bestFilter").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; bestFilter = b.dataset.f;
+$("bestFilter").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return;
+  if (bestFilter !== b.dataset.f) openId = null; /* aufgeklappte Bestellung bleibt nur im eigenen Reiter offen */
+  bestFilter = b.dataset.f;
   document.querySelectorAll("#bestFilter .chip").forEach(c => c.classList.toggle("on", c===b)); renderOrders(); };
 
 /* Ansicht wechseln (nur Admins): gleiche Rechte, aber Oberfläche wie Lager oder Zusteller */
