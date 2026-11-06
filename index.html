@@ -433,7 +433,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-creator";
+const SITE_VERSION = "2026-11-06-pakete";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -558,18 +558,33 @@ document.getElementById("minVal").textContent = eur(CONFIG.minOrder);
 let STOCK = null;
 async function loadStock(){
   try{
-    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/lager?select=id,name,groesse,preis,pfand_stk,alter_ab,kategorie,sort,shot,bestand,aktiv`, {
+    const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/lager?select=id,name,groesse,preis,pfand_stk,alter_ab,kategorie,sort,shot,bestand,aktiv,bestandteile`, {
       headers:{ apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` }, cache:"no-store" });
     if (!r.ok) throw new Error(r.status);
     const rows = await r.json();
     catalogFromDb(rows);
     // Lager noch nie befüllt (alles 0)? Dann Bestand ignorieren, sonst wäre alles „ausverkauft“.
     STOCK = rows.some(x => x.bestand > 0) ? Object.fromEntries(rows.map(x => [x.id, x.aktiv ? x.bestand : 0])) : null;
+    ACTIVE = new Set(rows.filter(x => x.aktiv).map(x => x.id));
+    PARTS = Object.fromEntries(rows.filter(x => x.bestandteile && typeof x.bestandteile === "object").map(x => [x.id, x.bestandteile]));
   }catch(e){ /* offline oder nicht erreichbar: ohne Bestandsanzeige weiter */ }
   render();
   return STOCK;
 }
-const avail = id => (STOCK && id in STOCK) ? STOCK[id] : Infinity;
+/* Pakete (z. B. Sixpack) haben keinen eigenen Bestand, sondern bestehen aus Einzelprodukten.
+   avail(id) = wie viele Stück davon gehen, wenn der restliche Warenkorb schon abgezogen ist. */
+let PARTS = {}, ACTIVE = new Set();
+function avail(id){
+  if (!STOCK) return Infinity;
+  const used = {};
+  for (const k in cart){ if (k === id || !cart[k]) continue;
+    const parts = PARTS[k] || { [k]: 1 };
+    for (const c in parts) used[c] = (used[c] || 0) + cart[k] * Number(parts[c]); }
+  const rest = c => Math.max((c in STOCK ? STOCK[c] : 0) - (used[c] || 0), 0);
+  if (PARTS[id]){ if (!ACTIVE.has(id)) return 0;
+    let n = Infinity; for (const c in PARTS[id]) n = Math.min(n, Math.floor(rest(c) / Number(PARTS[id][c]))); return n === Infinity ? 0 : n; }
+  return (id in STOCK) ? rest(id) : Infinity;
+}
 
 /* Events: Lieferung nur während eines Events im Umkreis */
 let EVENTS = [], LOC = null;

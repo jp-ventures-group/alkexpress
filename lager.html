@@ -402,7 +402,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-06-schichten";
+const APP_VERSION = "2026-11-06-pakete";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -1204,8 +1204,12 @@ function setEdit(id, patch){
 }
 function renderList(){
   const all = rows.map(cur);
-  const low = r => r.aktiv && r.bestand > 0 && r.bestand <= Math.max(r.mindest, 3);
-  const out = all.filter(r => r.aktiv && r.bestand===0).length, lw = all.filter(low).length, units = all.reduce((s,r)=>s+r.bestand,0);
+  const isPk = r => r.bestandteile && typeof r.bestandteile === "object";
+  /* Pakete haben keinen eigenen Bestand: möglich = was die Einzelprodukte hergeben */
+  const pkMoegl = r => { let n = Infinity; for (const c in r.bestandteile){ const x = all.find(y => y.id === c); n = Math.min(n, Math.floor((x && x.aktiv ? x.bestand : 0) / Number(r.bestandteile[c]))); } return n === Infinity ? 0 : n; };
+  const pkTxt = r => Object.entries(r.bestandteile).map(([c, q]) => { const x = all.find(y => y.id === c); return `${q}× ${x ? x.name : c}`; }).join(" + ");
+  const low = r => !isPk(r) && r.aktiv && r.bestand > 0 && r.bestand <= Math.max(r.mindest, 3);
+  const out = all.filter(r => r.aktiv && !isPk(r) && r.bestand===0).length, lw = all.filter(low).length, units = all.reduce((s,r)=>s+r.bestand,0);
   $("summary").innerHTML = `<span class="chip">${units} Stück gesamt</span>` + (lw?`<span class="chip low">${lw} knapp</span>`:"") + (out?`<span class="chip out">${out} ausverkauft</span>`:"");
   const ks = kats();
   $("katList").innerHTML = ks.map(k => `<option value="${esc(k)}">`).join("");
@@ -1215,17 +1219,18 @@ function renderList(){
   $("list").innerHTML = (prodOpen === "neu" ? `<div class="grp"><h3>Neues Produkt</h3>${prodForm(null)}</div>` : "") + groups.map(([title, g]) => {
     if (!g.length) return "";
     return `<div class="grp"><h3>${esc(title)}</h3>${g.map(r => {
-      const cls = !r.aktiv ? "off" : r.bestand===0 ? "out" : low(r) ? "low" : "";
-      const meta = !r.aktiv ? "im Shop ausgeblendet" : r.bestand===0 ? "ausverkauft" : low(r) ? "knapp" : "verfügbar";
+      const pk = isPk(r), pm = pk ? pkMoegl(r) : 0;
+      const cls = !r.aktiv ? "off" : (pk ? pm === 0 : r.bestand===0) ? "out" : low(r) ? "low" : "";
+      const meta = !r.aktiv ? "im Shop ausgeblendet" : pk ? (pm ? `aus Einzelprodukten: ${pm} möglich` : "nicht möglich (Zutat fehlt)") : r.bestand===0 ? "ausverkauft" : low(r) ? "knapp" : "verfügbar";
       return `<div class="row ${cls}">
         <div><div class="nm">${esc(r.name)}</div><div class="meta">${eur(r.preis)} · ${meta}${edits[r.id]?" · geändert":""}</div>
           <div style="display:flex;align-items:center;flex-wrap:wrap"><label class="tog"><input type="checkbox" data-act="aktiv" data-id="${r.id}" ${r.aktiv?"checked":""}> Im Shop</label>
           <button type="button" class="edit-btn" data-pe="${r.id}">${prodOpen === r.id ? "Schließen" : "✎ Bearbeiten"}</button></div></div>
-        <div class="ctl" role="group" aria-label="Bestand ${esc(r.name)}">
+        ${pk ? `<div class="meta" style="max-width:180px;text-align:right">${esc(pkTxt(r))}</div>` : `<div class="ctl" role="group" aria-label="Bestand ${esc(r.name)}">
           <button type="button" data-act="dec" data-id="${r.id}" aria-label="${esc(r.name)} weniger">−</button>
           <input type="number" min="0" inputmode="numeric" data-act="set" data-id="${r.id}" value="${r.bestand}" aria-label="Bestand ${esc(r.name)}">
           <button type="button" data-act="inc" data-id="${r.id}" aria-label="${esc(r.name)} mehr">+</button>
-        </div></div>${prodOpen === r.id ? prodForm(r) : ""}`; }).join("")}</div>`;
+        </div>`}</div>${prodOpen === r.id ? prodForm(r) : ""}`; }).join("")}</div>`;
   }).join("");
   const n = Object.keys(edits).length;
   $("saveBar").classList.toggle("hidden", !n || $("tab-lager").classList.contains("hidden"));
