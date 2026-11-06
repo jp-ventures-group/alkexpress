@@ -35,16 +35,23 @@ header{position:sticky;top:0;z-index:5;background:rgba(30,27,75,.94);backdrop-fi
 .menuback{position:fixed;inset:0;z-index:20;background:rgba(10,8,35,.55)}
 .menu{position:fixed;top:64px;right:max(10px,calc((100vw - 640px)/2 + 10px));z-index:21;width:min(340px,calc(100vw - 20px));max-height:calc(100dvh - 80px);overflow-y:auto;background:var(--paper);color:var(--ink);border-radius:18px;padding:8px 16px 12px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
 .menu.hidden,.menuback.hidden{display:none}
-.menu .msec{padding:12px 0;border-bottom:1px solid #E4E1F7}
-.menu .mlbl{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#5A5690;margin-bottom:8px}
-.menu .mitem{display:block;width:100%;text-align:left;border:0;background:none;color:var(--ink);font:600 16px var(--body,inherit);padding:11px 4px;border-radius:10px;cursor:pointer}
-.menu .mitem:hover{background:#EEEBFF}
-.menu .mitem.hidden{display:none}
-.menu .card{margin:0;padding:0!important;background:none;box-shadow:none}
-.menu #who select{width:100%;padding:10px!important;font-size:15px!important;border:1.5px solid #CFCBEF!important;border-radius:10px!important;color:var(--ink)!important;background:#fff!important}
-.menu #pushCard .btn.o{color:var(--ink)!important;border-color:var(--ink)!important}
-#menuBtn{position:relative}#menuBtn.dot::after{content:"";position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;background:var(--band18,#FF5B4F);border:2px solid var(--ink)}
-.menu .mver{font-size:12px;color:#8F8BB8;padding-top:10px}
+.menu .mhead{padding:14px 4px 12px;border-bottom:1px solid #E4E1F7}
+.menu .mname{font:800 22px/1.15 var(--display,inherit)}
+.menu .mrole{font-size:14px;color:#5A5690;margin-top:2px}
+.menu .mlist{display:grid}
+.menu .mrow{display:flex;align-items:center;gap:12px;width:100%;min-height:52px;padding:6px 4px;border:0;border-bottom:1px solid #E4E1F7;background:none;color:var(--ink);font:600 16px var(--body,inherit);text-align:left;cursor:pointer}
+.menu .mrow:last-child{border-bottom:0}
+.menu .mrow.hidden{display:none}
+.menu .mrow:active{background:#EEEBFF}
+.menu .mrow .ic{width:26px;text-align:center;font-size:19px;flex:none}
+.menu .mrow .r{margin-left:auto;flex:none}
+.menu .mrow .chev{font-size:22px;color:#8F8BB8}
+.menu .mrow.danger{color:#B42318}
+.menu .mrow select{border:1.5px solid #CFCBEF;border-radius:10px;padding:7px 10px;font:600 15px var(--body,inherit);color:var(--ink);background:#fff}
+.menu .pill{white-space:nowrap;font-size:13px;font-weight:700;border-radius:999px;padding:4px 10px}
+.menu .pill.on{background:#D1FADF;color:#067647}.menu .pill.off{background:#FEE4E2;color:#B42318}
+.menu .mhint{font-size:13px;line-height:1.4;color:#5A5690;padding:0 4px 12px 42px;border-bottom:1px solid #E4E1F7;margin-top:-4px}
+.menu .mver{font-size:12px;color:#8F8BB8;padding:10px 4px 0}
 .ghost{background:none;border:1px solid var(--line);border-radius:999px;padding:7px 11px;cursor:pointer;font-size:15px;line-height:1}
 @media (max-width:420px){.logo .team{display:none}}
 h1{font-family:var(--display);font-weight:800;font-stretch:78%;font-size:40px;line-height:.95;margin:24px 0 8px}
@@ -156,11 +163,11 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
 <header><div class="bar"><div class="logo"><span>Alk<b>Express</b></span><small class="team">Team</small><small id="ver" hidden></small></div><div style="display:flex;gap:6px;align-items:center;flex:none"><span class="who" id="whoTop"></span><button class="ghost hidden" id="menuBtn" aria-label="Menü" aria-expanded="false" style="font-size:20px;padding:6px 12px">☰</button></div></div></header>
 <div class="menuback hidden" id="menuBack"></div>
 <nav class="menu hidden" id="menu" aria-label="Menü">
-  <div class="msec"><div class="mlbl">Angemeldet als</div><div id="who"></div></div>
-  <div class="msec" id="pushSec"><div class="mlbl">Benachrichtigungen</div><div id="pushCard"></div></div>
-  <div class="msec"><div class="mlbl">Konto</div>
-    <button class="mitem hidden" id="pwBtn">🔑 Passwort ändern</button>
-    <button class="mitem hidden" id="logout">🚪 Abmelden</button>
+  <div class="mhead" id="who"></div>
+  <div class="mlist">
+    <div id="pushSec"><div id="pushCard"></div></div>
+    <button class="mrow hidden" id="pwBtn"><span class="ic">🔑</span><span>Passwort ändern</span><span class="r chev">›</span></button>
+    <button class="mrow danger hidden" id="logout"><span class="ic">🚪</span><span>Abmelden</span></button>
   </div>
   <div class="mver" id="menuVer"></div>
 </nav>
@@ -430,7 +437,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-06-menue";
+const APP_VERSION = "2026-11-06-menue2";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -542,30 +549,30 @@ async function pushSub(){
 async function renderPush(){
   const box = $("pushCard"); if (!box) return;
   const dot = on => $("menuBtn").classList.toggle("dot", on);
+  const row = (pill, cls, id) => `<button class="mrow" ${id ? `id="${id}"` : ""}><span class="ic">🔔</span><span>Benachrichtigungen</span><span class="r pill ${cls}">${pill}</span></button>`;
   if (!pushOk()){
-    dot(isIOS && !isStandalone());
-    box.innerHTML = isIOS && !isStandalone()
-      ? `<div class="card" style="padding:14px 16px"><b>🔔 Benachrichtigungen fürs iPhone</b><p style="margin:6px 0 0;font-size:14px">Damit dein Handy bei neuen Bestellungen klingelt: In Safari unten auf <b>Teilen</b> (□↑) → <b>Zum Home-Bildschirm</b>. Dann die App <b>„AE Team“</b> vom Home-Bildschirm öffnen und hier „Benachrichtigungen aktivieren“ tippen.</p></div>`
-      : `<div class="card" style="padding:14px 16px;font-size:14px">🔕 Dieser Browser kann keine Benachrichtigungen. Nimm Chrome (Android) oder auf dem iPhone die App vom Home-Bildschirm.</div>`;
+    const ios = isIOS && !isStandalone(); dot(ios);
+    box.innerHTML = ios
+      ? row("Einrichten", "off") + `<div class="mhint">In Safari auf <b>Teilen</b> (□↑) → <b>Zum Home-Bildschirm</b>. Dann „AE Team“ vom Home-Bildschirm öffnen und hier aktivieren.</div>`
+      : row("Geht nicht", "off") + `<div class="mhint">Dieser Browser kann keine Benachrichtigungen. Nimm Chrome (Android) oder am iPhone die App vom Home-Bildschirm.</div>`;
     return;
   }
   let sub = null; try{ sub = await pushSub(); }catch(e){}
   if (sub && Notification.permission === "granted"){
     dot(false);
     try{ await sb.rpc("push_abo_speichern", { p: { ...sub.toJSON(), geraet: navigator.userAgent.slice(0,120) } }); }catch(e){}
-    box.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:14px;margin:10px 0">🔔 Benachrichtigungen sind an <button class="btn o sm" style="color:inherit;border-color:currentColor" id="pushTest">Test senden</button></div>`;
+    box.innerHTML = row("An", "on") + `<button class="mrow" id="pushTest"><span class="ic">📨</span><span>Test-Benachrichtigung senden</span><span class="r chev">›</span></button>`;
     $("pushTest").onclick = async () => { const { error } = await sb.rpc("push_test"); toast(error ? error.message : "Test gesendet – kommt in ein paar Sekunden."); };
     return;
   }
   const denied = Notification.permission === "denied"; dot(true);
-  box.innerHTML = `<div class="card" style="padding:14px 16px"><b>🔔 Benachrichtigungen aktivieren</b>
-    <p style="margin:6px 0 10px;font-size:14px">Dein Handy klingelt dann bei jeder neuen Bestellung bzw. wenn eine Bestellung für dich zum Ausliefern bereit ist, auch wenn die App zu ist.</p>
-    ${denied ? `<p style="margin:0;font-size:14px;color:#B42318">Benachrichtigungen sind für diese Seite blockiert. Erlaube sie in den Einstellungen (iPhone: Einstellungen → Mitteilungen → AE Team; Android: Schloss-Symbol neben der Adresse → Benachrichtigungen).</p>`
-      : `<button class="btn y" id="pushOn" style="width:100%">Benachrichtigungen aktivieren</button>`}</div>`;
+  box.innerHTML = denied
+    ? row("Blockiert", "off") + `<div class="mhint">Erlaube sie in den Einstellungen: iPhone → Einstellungen → Mitteilungen → AE Team. Android → Schloss neben der Adresse → Benachrichtigungen.</div>`
+    : row("Aus", "off", "pushOn") + `<div class="mhint">Antippen zum Aktivieren. Dein Handy klingelt dann bei neuen Bestellungen, auch wenn die App zu ist.</div>`;
   if (!denied) $("pushOn").onclick = pushAktivieren;
 }
 async function pushAktivieren(){
-  const b = $("pushOn"); b.disabled = true; b.textContent = "Wird eingerichtet …";
+  const b = $("pushOn"); b.disabled = true; b.querySelector(".pill").textContent = "Wird eingerichtet …";
   try{
     const perm = await Notification.requestPermission();
     if (perm !== "granted"){ toast("Ohne Erlaubnis geht es nicht. Tipp nochmal und wähle „Erlauben“.", 6000); return renderPush(); }
@@ -620,9 +627,11 @@ $("bestFilter").onclick = e => { const b = e.target.closest("[data-f]"); if (!b)
 function applyRole(){
   const w = $("who");
   if (REAL_ROLE === "admin"){
-    w.innerHTML = `<div style="font-weight:700;margin-bottom:10px">${esc(ME)} · Admin</div><div class="mlbl">Ansicht</div><select id="viewSel" aria-label="Ansicht" style="background:transparent;color:inherit;border:1px solid var(--line);border-radius:999px;padding:4px 8px;font:inherit;font-size:13px">${["admin","lager","fahrer"].map(k => `<option value="${k}" ${ROLE===k?"selected":""} style="color:#1E1B4B">${ROLLEN[k]}</option>`).join("")}</select>`;
+    w.innerHTML = `<div class="mname">${esc(ME)}</div><div class="mrole">Admin</div>`;
+    let vr = $("viewRow"); if (!vr){ vr = document.createElement("label"); vr.className = "mrow"; vr.id = "viewRow"; $("pushSec").before(vr); }
+    vr.innerHTML = `<span class="ic">👁️</span><span>Ansicht</span><select class="r" id="viewSel" aria-label="Ansicht">${["admin","lager","fahrer"].map(k => `<option value="${k}" ${ROLE===k?"selected":""}>${ROLLEN[k]}</option>`).join("")}</select>`;
     $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(sk)); renderOrders(); renderSchicht(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`, 1800); };
-  } else w.textContent = ME + " · " + (ROLLEN[ROLE] || ROLE);
+  } else w.innerHTML = `<div class="mname">${esc(ME)}</div><div class="mrole">${esc(ROLLEN[ROLE] || ROLE)}</div>`;
   $("whoTop").textContent = ROLLEN[ROLE] || ROLE;
   document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
   $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
