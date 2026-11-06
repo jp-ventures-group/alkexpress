@@ -167,6 +167,11 @@ h2{font-family:var(--display);font-weight:800;font-stretch:80%;font-size:clamp(3
 .loc{display:grid;gap:8px;border:1.5px dashed #CFCBEF;border-radius:var(--r-sm);padding:12px}
 .loc button{justify-self:start;border:0;background:var(--ink);color:var(--paper);border-radius:999px;padding:10px 16px;font-weight:700;cursor:pointer}
 .loc .res{font-size:15px;font-weight:500}
+.loc .mapbtn{background:none!important;color:var(--ink)!important;border:1.5px solid var(--ink)!important}
+.loc .mapwrap{display:grid;gap:8px}
+.loc .mapwrap[hidden],.loc .mapbtn[hidden]{display:none}
+.loc #pickMap{height:280px;border-radius:12px;overflow:hidden;border:1px solid #CFCBEF}
+.loc .maphint{font-size:14px;color:#5A5690}
 .loc .res.ok{color:#0E7A57}.loc .res.bad{color:#B4231A}
 .youth{background:var(--paper);color:var(--ink);border-radius:var(--r-lg);padding:32px 24px;display:grid;gap:18px}
 .youth h2{color:var(--ink)}
@@ -399,6 +404,12 @@ dialog p{margin:0 0 18px}
         <small style="color:#5A5690">Wir liefern nur im Umkreis der Location. Wird beim Abschicken automatisch geprüft, dein Handy fragt dann nach Erlaubnis. Dein Standort wird nur für diese Bestellung verwendet.</small>
         <button type="button" id="locBtn">Meinen Standort prüfen</button>
         <div class="res" id="locRes" aria-live="polite"></div>
+        <button type="button" class="mapbtn" id="mapBtn" hidden>📍 Standort auf der Karte wählen</button>
+        <div class="mapwrap" id="mapWrap" hidden>
+          <span class="maphint">Tippe auf der Karte, wo du stehst, oder zieh den Pin dorthin. Er muss im markierten Kreis liegen.</span>
+          <div id="pickMap"></div>
+          <button type="button" id="mapOk">Diesen Treffpunkt bestätigen</button>
+        </div>
       </div>
       <label><span>Treffpunkt <span class="opt">(optional)</span></span><small>Wo vor der Location treffen wir dich? Wir liefern nicht hinein. Ohne Angabe ruft dich der Fahrer an.</small><textarea name="meet" placeholder="z. B. vor dem Haupteingang links, schwarze Jacke"></textarea></label>
       <label><span>Geburtsdatum <b class="req" aria-hidden="true">*</b></span><input name="dob" type="text" inputmode="numeric" autocomplete="bday" placeholder="TT.MM.JJJJ" maxlength="10" required></label>
@@ -437,7 +448,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-ohne-wunschzeit";
+const SITE_VERSION = "2026-11-06-kartenpin";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -701,9 +712,9 @@ function checkLoc(){
   return new Promise(resolve => {
     const res = document.getElementById("locRes"), sel = document.querySelector("[name=event]");
     const ev = liveEvents().find(x => x.id === sel.value);
-    const fail = t => { res.className = "res bad"; res.textContent = t; resolve(false); };
+    const fail = (t, karte) => { res.className = "res bad"; res.textContent = t; document.getElementById("mapBtn").hidden = !karte; resolve(false); };
     if (!ev) return fail("Gerade läuft keine Lieferung.");
-    if (!navigator.geolocation) return fail("Dein Browser kann den Standort nicht teilen.");
+    if (!navigator.geolocation) return fail("Dein Browser kann den Standort nicht teilen. Wähl ihn einfach auf der Karte.", true);
     res.className = "res"; res.textContent = "Standort wird ermittelt …";
     navigator.geolocation.getCurrentPosition(p => {
       const { latitude:lat, longitude:lng, accuracy:acc } = p.coords;
@@ -717,12 +728,51 @@ function checkLoc(){
       resolve(ok);
     }, err => {
       LOC = null;
-      fail(err.code === 1 ? "Standortzugriff abgelehnt. Erlaube ihn in den Browsereinstellungen und versuch es erneut." : "Standort konnte nicht ermittelt werden. Versuch es draußen nochmal.");
+      fail(err.code === 1 ? "Standortzugriff ist blockiert. Kein Problem: Wähl deinen Standort einfach auf der Karte." : "Standort konnte nicht ermittelt werden. Wähl ihn einfach auf der Karte.", true);
     }, { enableHighAccuracy:true, timeout:15000, maximumAge:30000 });
   });
 }
 document.getElementById("locBtn").addEventListener("click", () => checkLoc());
-document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; applyMode(); render(); });
+/* Fallback ohne GPS: Standort auf einer Karte wählen (Leaflet + OpenStreetMap, wird erst bei Bedarf geladen) */
+let PICK = null;
+function loadLeaflet(){
+  if (window.L) return Promise.resolve();
+  return new Promise((ok, no) => {
+    const c = document.createElement("link"); c.rel = "stylesheet"; c.href = "/vendor/leaflet/leaflet.css"; document.head.appendChild(c);
+    const j = document.createElement("script"); j.src = "/vendor/leaflet/leaflet.js"; j.onload = ok; j.onerror = no; document.head.appendChild(j);
+  });
+}
+async function openPick(){
+  const ev = liveEvents().find(x => x.id === document.querySelector("[name=event]").value), res = document.getElementById("locRes");
+  if (!ev) return;
+  document.getElementById("mapWrap").hidden = false; document.getElementById("mapBtn").hidden = true;
+  try{ await loadLeaflet(); }catch(e){ res.className = "res bad"; res.textContent = "Karte konnte nicht geladen werden. Prüf deine Internetverbindung."; return; }
+  if (PICK && PICK.ev !== ev.id){ PICK.map.remove(); PICK = null; }
+  if (!PICK){
+    const map = L.map("pickMap", { zoomControl:true }).setView([ev.lat, ev.lng], 17);
+    map.attributionControl.setPrefix(false);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map);
+    L.circle([ev.lat, ev.lng], { radius: ev.radius_m, color: "#FF5B4F", weight: 2, fillOpacity: .08 }).addTo(map);
+    const pin = L.marker([ev.lat, ev.lng], { draggable: true }).addTo(map);
+    map.on("click", e => pin.setLatLng(e.latlng));
+    PICK = { ev: ev.id, map, pin };
+  }
+  setTimeout(() => PICK && PICK.map.invalidateSize(), 50);
+  document.getElementById("mapWrap").scrollIntoView({ block:"center", behavior:"smooth" });
+}
+document.getElementById("mapBtn").addEventListener("click", openPick);
+document.getElementById("mapOk").addEventListener("click", () => {
+  const ev = liveEvents().find(x => x.id === document.querySelector("[name=event]").value), res = document.getElementById("locRes");
+  if (!ev || !PICK) return;
+  const { lat, lng } = PICK.pin.getLatLng(), dist = distM(lat, lng, ev.lat, ev.lng), ok = dist <= ev.radius_m;
+  res.className = "res " + (ok ? "ok" : "bad");
+  if (!ok){ res.textContent = `Der Pin liegt ca. ${Math.round(dist)} m entfernt. Wir liefern nur im Umkreis von ${ev.radius_m} m um ${ev.ort}.`; return; }
+  LOC = { event: ev.id, lat, lng, acc: null, dist, manuell: true };
+  res.textContent = `Passt: Treffpunkt auf der Karte gewählt, ca. ${Math.round(dist)} m von ${ev.ort}.`;
+  document.querySelector(".loc").classList.remove("bad");
+  document.getElementById("mapWrap").hidden = true;
+});
+document.querySelector("[name=event]").addEventListener("change", () => { LOC = null; document.getElementById("locRes").textContent = ""; document.getElementById("mapWrap").hidden = true; document.getElementById("mapBtn").hidden = true; applyMode(); render(); });
 document.getElementById("eventList").addEventListener("click", e => {
   const b = e.target.closest("[data-pre]"); if (!b) return;
   document.querySelector("[name=event]").value = b.dataset.pre; applyMode(); render();
@@ -1244,7 +1294,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
   try{
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...(await authHeaders()), "Content-Type":"application/json" },
-      body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
+      body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: (LOC && LOC.manuell && !pre ? "[Pin auf Karte gesetzt] " : "") + f.meet.value.trim(),
         lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: null,
         zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar"), code: GS ? GS.code : null, creator: CR ? CR.code : null } }) });
     const j = await r.json().catch(() => null);
