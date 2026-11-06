@@ -255,6 +255,10 @@ textarea{min-height:76px;resize:vertical}
 
 dialog{border:0;border-radius:var(--r-lg);padding:28px 24px;max-width:min(440px,calc(100% - 32px));background:var(--paper);color:var(--ink)}
 dialog::backdrop{background:rgba(10,8,35,.85)}
+#drunk h2{margin:0 0 8px}#drunk p{margin:0 0 18px}
+#drunk .drow{display:grid;gap:12px}
+#drunk .dbig{border:0;border-radius:18px;background:var(--band16);color:var(--ink);font:800 26px/1.1 var(--body);padding:22px 16px;cursor:pointer}
+#drunk .dsmall{border:1.5px solid var(--ink);border-radius:999px;background:none;color:var(--ink);font:700 16px var(--body);padding:14px;cursor:pointer}
 .hdr-r{display:flex;align-items:center;gap:8px}
 @media (max-width:440px){#acctLbl{display:none}.acct-btn{padding:8px 10px}.acct-btn.in::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:#4FD6A8;margin-left:4px;vertical-align:2px}}
 .acct-btn{border:1.5px solid rgba(246,244,255,.35);background:none;color:var(--paper);border-radius:999px;padding:8px 12px;font-weight:700;cursor:pointer;max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -304,7 +308,6 @@ dialog p{margin:0 0 18px}
   <div class="hero">
     <div class="wrap">
       <a class="promo" id="promo" href="#sortiment" hidden></a>
-      <button type="button" class="easybtn" id="easyOn">🥴 Ich bin besoffen</button>
       <button type="button" class="easyoff" id="easyOff">Zurück zur normalen Ansicht</button>
       <div class="status" id="status" role="status"><span class="dot"></span><div><b id="statusTitle">Lieferstatus wird geladen …</b><span id="statusSub"></span></div></div>
       <h1>Drinks direkt vor dein Event. In 15 Minuten.</h1>
@@ -450,6 +453,14 @@ dialog p{margin:0 0 18px}
   </div>
 </aside>
 
+<dialog id="drunk">
+  <h2>Wie geht's dir gerade?</h2>
+  <p>Wenn du schon gut dabei bist, zeigen wir dir eine einfache Ansicht: nur die Getränke, alles groß und leicht zu tippen.</p>
+  <div class="drow">
+    <button class="dbig" id="drunkYes">🥴 Ich bin besoffen</button>
+    <button class="dsmall" id="drunkNo">Noch nüchtern, normale Ansicht</button>
+  </div>
+</dialog>
 <dialog id="gate">
   <h2>Bist du mindestens 16?</h2>
   <p>AlkExpress verkauft alkoholische Getränke. Bei der Lieferung prüfen wir deinen Ausweis.</p>
@@ -471,7 +482,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-besoffen";
+const SITE_VERSION = "2026-11-06-besoffen-popup";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -763,7 +774,6 @@ function setEasy(on){
   window.scrollTo(0, 0);
 }
 try{ if (localStorage.getItem("ae_easy") === "1") document.body.classList.add("easy"); }catch(e){}
-document.getElementById("easyOn").addEventListener("click", () => setEasy(true));
 document.getElementById("easyOff").addEventListener("click", () => setEasy(false));
 /* Fallback ohne GPS: Standort auf einer Karte wählen (Leaflet + OpenStreetMap, wird erst bei Bedarf geladen) */
 let PICK = null;
@@ -1401,8 +1411,15 @@ document.getElementById("send").textContent = sendLabel;
 
 /* Altersabfrage beim ersten Besuch */
 const gate = document.getElementById("gate");
-if (!store.get("ae24_16")) gate.showModal();
-document.getElementById("gateYes").onclick = () => { store.set("ae24_16", true); gate.close(); };
+/* Nach der Altersabfrage (einmal pro Besuch): "Ich bin besoffen"-Frage */
+const drunk = document.getElementById("drunk");
+function askDrunk(){ let x = null; try{ x = sessionStorage.getItem("ae_drunk_q"); }catch(e){} if (!x && !drunk.open) drunk.showModal(); }
+const drunkDone = on => { try{ sessionStorage.setItem("ae_drunk_q", "1"); }catch(e){} drunk.close(); setEasy(on); };
+document.getElementById("drunkYes").onclick = () => drunkDone(true);
+document.getElementById("drunkNo").onclick = () => drunkDone(false);
+drunk.addEventListener("cancel", e => { e.preventDefault(); drunkDone(false); });
+if (!store.get("ae24_16")) gate.showModal(); else askDrunk();
+document.getElementById("gateYes").onclick = () => { store.set("ae24_16", true); gate.close(); askDrunk(); };
 document.getElementById("gateNo").onclick = () => {
   gate.querySelector("h2").textContent = "Dann leider noch nicht.";
   gate.querySelector("p").textContent = "Alkoholische Getränke dürfen in der Steiermark erst ab 16 erworben werden, Spirituosen ab 18. Komm gern wieder, wenn's so weit ist.";
