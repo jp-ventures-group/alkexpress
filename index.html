@@ -438,7 +438,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-aktion";
+const SITE_VERSION = "2026-11-06-live-ohne-vorbest";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -596,7 +596,8 @@ let EVENTS = [], LOC = null;
 const sbHeaders = { apikey: CONFIG.supabaseKey, Authorization: `Bearer ${CONFIG.supabaseKey}` };
 const liveEvents = (now = new Date()) => EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) <= now && now < new Date(e.liefer_bis));
 /* Vorbestellung: kommende Events, nur mit Online-Zahlung */
-const preEvents = (now = new Date()) => (typeof ONLINE !== "undefined" && ONLINE.aktiv) ? EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) > now) : [];
+/* Läuft gerade ein Event, gibt es keine Vorbestellung: dann nur direkte Bestellungen fürs laufende Event */
+const preEvents = (now = new Date()) => (typeof ONLINE !== "undefined" && ONLINE.aktiv && !liveEvents(now).length) ? EVENTS.filter(e => e.aktiv && new Date(e.liefer_von) > now) : [];
 const selEventId = () => document.querySelector("[name=event]").value;
 const selEvent = () => liveEvents().find(e => e.id === selEventId()) || preEvents().find(e => e.id === selEventId());
 const isPre = () => !liveEvents().some(e => e.id === selEventId()) && preEvents().some(e => e.id === selEventId());
@@ -687,7 +688,7 @@ function renderEvents(){
     const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), isLive = a <= now && now < b;
     return `<li><div class="d">${fmtDay(a)}<small>${fmtTime(a)}–${fmtTime(b)}</small></div>
       <div class="n">${esc(e.name)}${isLive ? ' <span class="live">· jetzt live</span>' : ""}${Number(e.rabatt_pct) ? ` <span class="live">· −${pctTxt(e.rabatt_pct)} % auf alles</span>` : ""}</div>
-      <div class="o">Vor ${esc(e.ort)} · Übergabe draußen im Umkreis von ${e.radius_m} m</div>${!isLive && ONLINE.aktiv ? `<button type="button" class="pre-btn" data-pre="${e.id}">Jetzt vorbestellen</button>` : ""}</li>`;
+      <div class="o">Vor ${esc(e.ort)} · Übergabe draußen im Umkreis von ${e.radius_m} m</div>${!isLive && ONLINE.aktiv && !live.length ? `<button type="button" class="pre-btn" data-pre="${e.id}">Jetzt vorbestellen</button>` : ""}</li>`;
   }).join("") : `<li class="empty-ev">Gerade sind keine Events geplant. Folg uns auf Instagram, dann verpasst du das nächste nicht.</li>`;
   const sel = document.querySelector("[name=event]"), prev = sel.value;
   const pre = preEvents(now);
