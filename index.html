@@ -393,7 +393,6 @@ dialog p{margin:0 0 18px}
       <div class="prebox" id="preBox" hidden>
         <strong>📅 Vorbestellung</strong>
         <small id="preTxt"></small>
-        <label><span>Wunschzeit <span class="opt">(optional)</span></span><select name="wunsch"></select></label>
       </div>
       <div class="loc">
         <strong style="font-size:15px">Standort <b class="req" aria-hidden="true">*</b></strong>
@@ -438,7 +437,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-ohne-mbw";
+const SITE_VERSION = "2026-11-06-ohne-wunschzeit";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -612,12 +611,7 @@ function applyMode(){
     pay.value = "online"; pay.disabled = true;
   } else if (pay.disabled){ pay.disabled = false; if (pay.dataset.prev && pay.querySelector(`option[value="${pay.dataset.prev}"]`)) pay.value = pay.dataset.prev; }
   payLabel();
-  if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online. Wir liefern am Event-Abend zu deiner Wunschzeit <b>vor ${esc(ev.ort)}</b> (Übergabe draußen, im Umkreis von ${ev.radius_m} m), und melden uns vorher per WhatsApp.`;
-  if (pre && ev && MODE_EV !== ev.id){
-    const w = document.querySelector("[name=wunsch]"), a = new Date(ev.liefer_von), b = new Date(ev.liefer_bis), opts = ['<option value="">So früh wie möglich</option>'];
-    for (let t = new Date(a); t < b; t = new Date(t.getTime() + 30*60e3)) opts.push(`<option value="${t.toISOString()}">ab ${fmtTime(t)} Uhr</option>`);
-    w.innerHTML = opts.join("");
-  }
+  if (pre && ev) document.getElementById("preTxt").innerHTML = `Du bezahlst jetzt online. Sobald die Lieferung am Event-Abend startet, bringen wir dir deine Bestellung so schnell wie möglich <b>vor ${esc(ev.ort)}</b> (Übergabe draußen, im Umkreis von ${ev.radius_m} m), und melden uns vorher per WhatsApp.`;
   MODE_EV = pre && ev ? ev.id : null;
 }
 const fmtDay = d => d.toLocaleDateString("de-AT", { weekday:"short", day:"2-digit", month:"2-digit" });
@@ -1251,7 +1245,7 @@ document.getElementById("orderForm").addEventListener("submit", async e => {
     const r = await fetch(`${CONFIG.supabaseUrl}/rest/v1/rpc/bestellung_anlegen`, { method:"POST",
       headers:{ ...(await authHeaders()), "Content-Type":"application/json" },
       body: JSON.stringify({ p: { event_id: ev.id, posten: cart, name: f.name.value.trim(), tel: f.phone.value.trim(), treffpunkt: f.meet.value.trim(),
-        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: pre ? (f.wunsch.value || null) : null,
+        lat: pre ? null : LOC.lat, lng: pre ? null : LOC.lng, leergut: t.retN, website: f.website.value, gutschein: GIFT && age >= 18 ? GIFT : null, vorbestellung: pre, wunschzeit: null,
         zahlart: pre ? "online" : (["bar","karte","online"].includes(f.pay.value) ? f.pay.value : "bar"), code: GS ? GS.code : null, creator: CR ? CR.code : null } }) });
     const j = await r.json().catch(() => null);
     if (r.ok) srv = j; else if (j && j.message) { send.disabled = false; send.textContent = sendLabel;
