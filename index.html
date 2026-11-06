@@ -66,6 +66,27 @@ header{position:sticky;top:0;z-index:20;background:rgba(30,27,75,.92);backdrop-f
 .hero p{max-width:34ch;color:var(--muted);font-size:19px;margin:0 0 28px}
 .cta{display:inline-flex;align-items:center;gap:10px;background:var(--band16);color:var(--ink);font-weight:700;text-decoration:none;border-radius:999px;padding:15px 26px;border:0;cursor:pointer;font-size:17px}
 .cta:hover{filter:brightness(1.05)}
+/* "Ich bin besoffen": einfache Ansicht – nur Getränke, alles groß */
+.easybtn{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;max-width:560px;margin:0 0 22px;padding:18px 20px;border-radius:18px;border:2px solid var(--band16);background:transparent;color:var(--band16);font:800 22px/1.1 var(--body);cursor:pointer}
+.easyoff{display:none}
+body.easy .easybtn{display:none}
+body.easy .easyoff{display:block;width:100%;max-width:560px;margin:0 0 16px;padding:10px;border-radius:999px;border:1px solid var(--line);background:none;color:var(--muted);font:600 15px var(--body);cursor:pointer}
+body.easy main > section:not(#sortiment),body.easy footer,body.easy .bands,body.easy .hero h1,body.easy .hero p,body.easy .facts,body.easy .hero .cta,body.easy #sortiment h2,body.easy #sortiment .lede,body.easy #sortiment .note,body.easy .acct-btn,body.easy .item .nm .tag,body.easy .minibar{display:none!important}
+body.easy .hero{padding:20px 0 0}
+body.easy #sortiment{padding-top:0}
+body.easy #sortiment .cat:first-child{margin-top:4px}
+body.easy .promo b{font-size:30px}
+body.easy .cat{margin-top:22px}
+body.easy .cat-head h3{font-size:34px}
+body.easy .item{grid-template-columns:1fr;gap:10px;padding:18px 0}
+body.easy .item .nm{font-size:26px;line-height:1.15}
+body.easy .item .sz{font-size:17px}
+body.easy .item .right{justify-content:space-between}
+body.easy .price{font-size:26px;text-align:left}
+body.easy .step button{width:64px;height:64px;font-size:34px;font-weight:700}
+body.easy .step output{min-width:44px;font-size:28px}
+body.easy .dock button{padding:22px 26px;font-size:22px}
+body.easy .cart-btn{font-size:18px;padding:12px 18px}
 /* Das Bändchen: das eine auffällige Element */
 .bands{position:absolute;left:-10%;right:-10%;bottom:28px;transform:rotate(-4deg);display:grid;gap:10px;pointer-events:none}
 .band{height:34px;display:flex;align-items:center;white-space:nowrap;overflow:hidden;font-family:var(--display);font-weight:700;font-stretch:80%;font-size:15px;color:var(--ink);
@@ -283,6 +304,8 @@ dialog p{margin:0 0 18px}
   <div class="hero">
     <div class="wrap">
       <a class="promo" id="promo" href="#sortiment" hidden></a>
+      <button type="button" class="easybtn" id="easyOn">🥴 Ich bin besoffen</button>
+      <button type="button" class="easyoff" id="easyOff">Zurück zur normalen Ansicht</button>
       <div class="status" id="status" role="status"><span class="dot"></span><div><b id="statusTitle">Lieferstatus wird geladen …</b><span id="statusSub"></span></div></div>
       <h1>Drinks direkt vor dein Event. In 15 Minuten.</h1>
       <p>Wir liefern bei ausgewählten Events in Graz <b>in die unmittelbare Nähe der Location</b>, also davor, nicht hinein: zum Eingang, Vorplatz oder Raucherbereich. Bestell online, wir bringen's dir zu Fuß.</p>
@@ -448,7 +471,7 @@ dialog p{margin:0 0 18px}
 
 <script>
 /* Immer die neueste Version laden (Safari hält sonst alte Versionen fest) */
-const SITE_VERSION = "2026-11-06-kartenpin";
+const SITE_VERSION = "2026-11-06-besoffen";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/SITE_VERSION = "([^"]+)"/);
   if (m && m[1] !== SITE_VERSION && !sessionStorage.getItem("ae_site_" + m[1])){
@@ -733,6 +756,15 @@ function checkLoc(){
   });
 }
 document.getElementById("locBtn").addEventListener("click", () => checkLoc());
+/* Einfache Ansicht ("Ich bin besoffen"), bleibt gespeichert */
+function setEasy(on){
+  document.body.classList.toggle("easy", on);
+  try{ on ? localStorage.setItem("ae_easy", "1") : localStorage.removeItem("ae_easy"); }catch(e){}
+  window.scrollTo(0, 0);
+}
+try{ if (localStorage.getItem("ae_easy") === "1") document.body.classList.add("easy"); }catch(e){}
+document.getElementById("easyOn").addEventListener("click", () => setEasy(true));
+document.getElementById("easyOff").addEventListener("click", () => setEasy(false));
 /* Fallback ohne GPS: Standort auf einer Karte wählen (Leaflet + OpenStreetMap, wird erst bei Bedarf geladen) */
 let PICK = null;
 function loadLeaflet(){
