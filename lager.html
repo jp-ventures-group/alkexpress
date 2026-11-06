@@ -46,6 +46,9 @@ label{display:grid;gap:6px;font-weight:700;font-size:15px}
 .btn:disabled{opacity:.4;cursor:not-allowed}
 .btns{display:flex;gap:8px;flex-wrap:wrap}
 .note{border-radius:10px;padding:12px;font-weight:500;margin-top:12px}
+.schz{margin-top:2px}.schp{display:inline-flex;align-items:center;gap:2px;background:#EFEDFF;border-radius:999px;padding:1px 8px;margin:2px 2px 0 0;font-size:13px;color:var(--ink)}
+.schp button{border:0;background:none;cursor:pointer;font-size:15px;line-height:1;padding:0 0 0 2px;color:#A1271D}.schadd{font-size:13px;padding:2px 6px;border-radius:8px;margin-top:2px;background:#fff;color:#1E1B4B;border:1px solid #CFCBEF}
+.schr{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 0;border-top:1px solid #DEDAF5}.schr .meta{font-size:13px;color:#5A5690}
 .gsr{padding:12px 0;border-top:1px solid #DEDAF5}.gsr.off{opacity:.55}.gsc{font-family:ui-monospace,monospace;font-weight:800;font-size:18px;letter-spacing:.04em}.gsr .meta{font-size:14px;color:#5A5690}
 .csvbox{margin-top:14px;padding:12px;border-radius:12px;border:1.5px solid #CFCBEF;display:grid;gap:10px;font-size:15px;word-break:break-all}.csvbox span{color:var(--muted)}
 .note.ok{background:#DDF7EE;color:#0E5A42}
@@ -172,6 +175,7 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
       <button class="chip" data-f="heute">Heute erledigt</button>
       <button class="chip" data-f="alle">Alle</button>
     </div>
+    <div id="schichtCard"></div>
     <div id="fahrerCard"></div>
     <div id="testBar"></div>
     <div id="legacyCard"></div>
@@ -220,6 +224,11 @@ nav.tabs button.on::before{content:"";position:absolute;top:0;left:25%;right:25%
           <label>Lieferung ab <input type="time" name="von" value="19:00" required></label>
           <label>Lieferung bis <small>(nach Mitternacht = Folgetag)</small><input type="time" name="bis" value="02:00" required></label>
         </div>
+        <div class="f2">
+          <label>Zusteller gebraucht <input type="number" name="bf" min="0" max="30" value="0" inputmode="numeric"></label>
+          <label>Lager gebraucht <input type="number" name="bl" min="0" max="30" value="0" inputmode="numeric"></label>
+        </div>
+        <p class="muted" style="margin:-4px 0 0;font-size:13px">0 bei beiden = keine Planung, jeder kann am Abend einchecken. Sonst können nur Eingeteilte einchecken.</p>
         <label>Position der Location <small>Google-Maps-Link oder Koordinaten einfügen, oder vor Ort Standort übernehmen</small>
           <input type="text" name="pos" placeholder="z. B. 47.0667, 15.4296" required></label>
         <div class="btns" style="align-items:center"><button type="button" class="btn sm" id="hereBtn">Aktuellen Standort übernehmen</button><span id="posInfo" style="font-size:14px;color:#5A5690"></span></div>
@@ -393,7 +402,7 @@ const SUPA_URL = "https://smjspmfvdjvyohpoqxgl.supabase.co";
 const SUPA_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNtanNwbWZ2ZGp2eW9ocG9xeGdsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM0NDI0NjcsImV4cCI6MjEwOTAxODQ2N30.qigoZ7S6dn5lZDXcOxsTQDolnVPsaod2UH-9Ns1M5ak";
 const sb = supabase.createClient(SUPA_URL, SUPA_KEY);
 /* Immer die neueste Version laden (Safari/Home-Bildschirm halten sonst alte Versionen fest) */
-const APP_VERSION = "2026-11-06-creator";
+const APP_VERSION = "2026-11-06-schichten";
 fetch(location.pathname + "?v=" + Date.now(), { cache:"no-store" }).then(r => r.text()).then(t => {
   const m = t.match(/APP_VERSION = "([^"]+)"/);
   if (m && m[1] !== APP_VERSION && !sessionStorage.getItem("ae_reloaded_" + m[1])){
@@ -519,7 +528,7 @@ function applyRole(){
   const w = $("who");
   if (REAL_ROLE === "admin"){
     w.innerHTML = `<select id="viewSel" aria-label="Ansicht" style="background:transparent;color:inherit;border:1px solid var(--line);border-radius:999px;padding:4px 8px;font:inherit;font-size:13px">${["admin","lager","fahrer"].map(k => `<option value="${k}" ${ROLE===k?"selected":""} style="color:#1E1B4B">${ROLLEN[k]}</option>`).join("")}</select>`;
-    $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(sk)); renderOrders(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`, 1800); };
+    $("viewSel").onchange = e => { ROLE = e.target.value; try{ localStorage.setItem("ae_ansicht", ROLE); }catch(x){} applyRole(); seenIds = new Set(orders.map(sk)); renderOrders(); renderSchicht(); renderFahrer(); updSum(); toast(`Ansicht: ${ROLLEN[ROLE]}`, 1800); };
   } else w.textContent = ME + " · " + (ROLLEN[ROLE] || ROLE);
   document.querySelectorAll('nav.tabs button:not([data-tab="best"])').forEach(b => b.classList.toggle("hidden", !isChef()));
   $("bestFilter").querySelector('[data-f="alle"]').classList.toggle("hidden", !isChef());
@@ -836,6 +845,65 @@ function showQr(o){
 }
 $("qrClose").onclick = () => { $("qrModal").classList.add("hidden"); try{ showQr.lock && showQr.lock.release(); }catch(e){} };
 
+/* ================= Schichtplanung: Plätze pro Event ================= */
+let SCH = {};
+const R_TXT = { fahrer:"Zusteller", lager:"Lager" };
+async function loadSchichten(){
+  const { data, error } = await sb.rpc("schichten_lesen");
+  if (error) return;
+  SCH = Object.fromEntries((data || []).map(x => [x.event_id, x]));
+  renderEvents(); renderSchicht(); renderFahrer();
+}
+const bedarf = (e, r) => Number(r === "fahrer" ? e.bedarf_fahrer : e.bedarf_lager) || 0;
+const geplant = e => bedarf(e, "fahrer") > 0 || bedarf(e, "lager") > 0;
+const leute = (id, r) => ((SCH[id] && SCH[id].leute) || []).filter(x => !r || x.rolle === r);
+const binDrin = id => leute(id).some(x => x.ich);
+function planHtml(e, past){
+  if (!geplant(e) && !leute(e.id).length) return "";
+  const teil = r => { const b = bedarf(e, r), l = leute(e.id, r); if (!b && !l.length) return "";
+    const voll = l.length >= b;
+    const namen = l.map(x => `<span class="schp">${esc(x.name)}${isChef() && !past && x.email ? `<button type="button" data-schweg="${esc(x.email)}" data-sev="${e.id}" aria-label="${esc(x.name)} austragen">×</button>` : ""}</span>`).join(" ");
+    const frei = TEAM.filter(t => t.rolle === r && !leute(e.id).some(x => x.email === String(t.email).toLowerCase()));
+    const add = isChef() && !past && !voll && frei.length ? `<select class="schadd" data-sev="${e.id}"><option value="">+ eintragen</option>${frei.map(t => `<option value="${esc(t.email)}">${esc(t.name || t.email)}</option>`).join("")}</select>` : "";
+    return `<div class="schz"><b style="color:${voll ? "#4FD6A8" : "#FF8A7A"}">👥 ${R_TXT[r]} ${l.length}/${b}</b> ${namen} ${add}</div>`; };
+  return `<div class="meta" style="margin-top:4px">${teil("fahrer")}${teil("lager")}</div>`;
+}
+document.addEventListener("click", async e => {
+  const w = e.target.closest("[data-schweg]"); if (!w) return;
+  const { error } = await sb.rpc("schicht_setzen", { p_event: w.dataset.sev, p_email: w.dataset.schweg, p_an: false });
+  if (error) return toast(error.message); toast("Ausgetragen."); loadSchichten();
+});
+document.addEventListener("change", async e => {
+  const s = e.target.closest(".schadd"); if (!s || !s.value) return;
+  const { error } = await sb.rpc("schicht_setzen", { p_event: s.dataset.sev, p_email: s.value, p_an: true });
+  if (error){ toast(error.message); s.value = ""; return; } toast("Eingetragen."); loadSchichten();
+});
+/* Karte fürs Team: für kommende Events anmelden */
+function renderSchicht(){
+  const box = $("schichtCard"); if (!box) return;
+  const r = isZust() ? "fahrer" : isLager() ? "lager" : null;
+  if (!r){ box.innerHTML = ""; return; }
+  const now = Date.now();
+  const list = events.filter(e => e.aktiv && new Date(e.liefer_bis) > now && new Date(e.liefer_von) - now < 45*864e5 && (bedarf(e, r) > 0 || binDrin(e.id)))
+    .sort((a, b) => new Date(a.liefer_von) - new Date(b.liefer_von));
+  if (!list.length){ box.innerHTML = ""; return; }
+  box.innerHTML = `<div class="card"><h2 style="margin:0 0 4px">Meine Einsätze</h2>
+    <p class="muted" style="margin:0 0 10px;font-size:14px">Melde dich für die Abende an, an denen du kannst. Einchecken geht nur, wenn du eingeteilt bist.</p>
+    ${list.map(e => { const b = bedarf(e, r), n = leute(e.id, r).length, ich = binDrin(e.id), live = new Date(e.liefer_von) <= now;
+      return `<div class="schr"><div><strong>${esc(e.name)}</strong><div class="meta">${fmtDT(new Date(e.liefer_von))}–${fmtT(new Date(e.liefer_bis))} · ${esc(e.ort)}</div>
+        <div class="meta">${R_TXT[r]}: ${n}/${b}${leute(e.id, r).length ? " · " + leute(e.id, r).map(x => esc(x.name)).join(", ") : ""}</div></div>
+        <div>${ich ? `<span class="badge" style="background:#D1FADF;color:#067647;margin:0">✓ eingeteilt</span>${live ? "" : ` <button type="button" class="btn o sm" data-sch="${e.id}" data-an="0">Abmelden</button>`}`
+          : n >= b ? `<span class="badge" style="background:#EEE;color:#555;margin:0">voll</span>`
+          : `<button type="button" class="btn y sm" data-sch="${e.id}" data-an="1">Anmelden</button>`}</div></div>`; }).join("")}</div>`;
+}
+$("schichtCard").addEventListener("click", async e => {
+  const b = e.target.closest("[data-sch]"); if (!b) return; b.disabled = true;
+  const an = b.dataset.an === "1";
+  const { error } = await sb.rpc("schicht_anmelden", { p_event: b.dataset.sch, p_an: an });
+  if (error){ b.disabled = false; return toast(error.message); }
+  toast(an ? "Angemeldet. Danke!" : "Abgemeldet."); loadSchichten();
+});
+
 /* ================= Fahrer: Check-in & meine Kasse ================= */
 function renderFahrer(){
   const box = $("fahrerCard"); if (!box) return;
@@ -851,7 +919,7 @@ function renderFahrer(){
       <p class="muted" style="margin:4px 0 10px;font-size:14px">Bestätigte Bestellungen kommen automatisch mit Ton. Wer zuerst „Ich liefere“ tippt, übernimmt.</p>
       <button class="btn o sm" data-checkin="">Fertig für heute</button>`
     : relevant.length ? `<p style="margin:0 0 8px"><strong>Bei welchem Event bist du dabei?</strong></p>
-      <div class="btns">${relevant.map(e => `<button class="btn y" data-checkin="${e.id}">${esc(e.name)}</button>`).join("")}</div>`
+      <div class="btns">${relevant.map(e => geplant(e) && !binDrin(e.id) ? `<button class="btn o" disabled title="Nicht eingeteilt">${esc(e.name)} · nicht eingeteilt</button>` : `<button class="btn y" data-checkin="${e.id}">${esc(e.name)}</button>`).join("")}</div>`
     : `<p style="margin:0" class="muted">Heute ist kein Event geplant.</p>`}
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid #DDD9F5">
       <strong>Meine Kasse (letzte 18 h)</strong>
@@ -1192,6 +1260,7 @@ async function loadEvents(){
   const { data, error } = await sb.from("events").select("*").gt("liefer_bis", since).order("liefer_von");
   if (error) return note($("evMsg"), "Events konnten nicht geladen werden: " + error.message);
   events = data; renderEvents(); renderFahrer(); renderOrders(); if (isChef() && TEAM.length) renderTeam(); if (KU_RAW) buildKunden();
+  loadSchichten();
 }
 const EV_F = { art: "", ort: "", stadt: "", sort: "datum", past: false, paused: false };
 const evStadt = e => /wien/i.test(`${e.ort} ${e.name}`) ? "Wien" : "Graz";
@@ -1201,7 +1270,7 @@ function evRow(e, now){
   const a = new Date(e.liefer_von), b = new Date(e.liefer_bis), live = e.aktiv && a <= now && now < b, past = b <= now;
   const state = !e.aktiv ? "pausiert" : live ? "jetzt live" : past ? "vorbei" : "geplant";
   return `<div class="ev ${live ? "live" : ""} ${!e.aktiv || past ? "off" : ""}">
-    <div><div class="nm">${esc(e.name)} <span class="arttag">${esc(evArt(e))}</span></div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div></div>
+    <div><div class="nm">${esc(e.name)} <span class="arttag">${esc(evArt(e))}</span></div><div class="meta">${esc(e.ort)} · ${fmtDT(a)}–${fmtT(b)} · ${e.radius_m} m · ${state}</div>${planHtml(e, past)}</div>
     <div class="acts"><button type="button" data-ev="edit" data-id="${e.id}">✎</button><button type="button" data-ev="toggle" data-id="${e.id}">${e.aktiv ? "Pausieren" : "Aktivieren"}</button>
       <button type="button" data-ev="del" data-id="${e.id}" aria-label="${esc(e.name)} löschen">Löschen</button></div></div>`;
 }
@@ -1269,14 +1338,14 @@ function evEdit(ev){
   EV_EDIT = ev.id;
   f.name.value = ev.name; f.ort.value = ev.ort; f.art.value = evArt(ev); f.tag.value = isoDay(a); f.von.value = hhmm(a); f.bis.value = hhmm(b);
   if (![...f.radius.options].some(o => o.value === String(ev.radius_m))) f.radius.add(new Option(`${ev.radius_m} m`, ev.radius_m));
-  f.radius.value = String(ev.radius_m);
+  f.radius.value = String(ev.radius_m); f.bf.value = ev.bedarf_fahrer || 0; f.bl.value = ev.bedarf_lager || 0;
   f.pos.value = `${Number(ev.lat).toFixed(6)}, ${Number(ev.lng).toFixed(6)}`; $("posInfo").textContent = `Erkannt: ${Number(ev.lat).toFixed(5)}, ${Number(ev.lng).toFixed(5)}`;
   $("evHead").textContent = `„${ev.name}“ bearbeiten`; $("evSubmit").textContent = "Änderungen speichern"; $("evCancel").classList.remove("hidden");
   $("evHead").scrollIntoView({ behavior:"smooth", block:"start" });
 }
 function evReset(){
   const f = $("evForm"); EV_EDIT = null;
-  f.name.value = ""; f.ort.value = ""; f.art.value = "Maturaball"; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; $("posInfo").textContent = "";
+  f.name.value = ""; f.ort.value = ""; f.art.value = "Maturaball"; f.pos.value = ""; f.tag.value = ""; f.von.value = "19:00"; f.bis.value = "02:00"; f.radius.value = "150"; f.bf.value = 0; f.bl.value = 0; $("posInfo").textContent = "";
   $("evHead").textContent = "Event hinzufügen"; $("evSubmit").textContent = "Event speichern"; $("evCancel").classList.add("hidden");
 }
 $("evCancel").onclick = evReset;
@@ -1300,7 +1369,8 @@ $("evForm").addEventListener("submit", async e => {
   if (!pos) return note($("evMsg"), "Position nicht erkannt. Füge Koordinaten wie „47.0667, 15.4296“ oder einen Google-Maps-Link ein.");
   const von = new Date(`${f.tag.value}T${f.von.value}`), bis = new Date(`${f.tag.value}T${f.bis.value}`);
   if (bis <= von) bis.setDate(bis.getDate() + 1);
-  const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), art: f.art.value, lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString() };
+  const row = { name: f.name.value.trim(), ort: f.ort.value.trim(), art: f.art.value, lat: pos.lat, lng: pos.lng, radius_m: parseInt(f.radius.value), liefer_von: von.toISOString(), liefer_bis: bis.toISOString(),
+    bedarf_fahrer: Math.min(Math.max(parseInt(f.bf.value) || 0, 0), 30), bedarf_lager: Math.min(Math.max(parseInt(f.bl.value) || 0, 0), 30) };
   const edit = EV_EDIT;
   const { error } = edit ? await sb.from("events").update(row).eq("id", edit) : await sb.from("events").insert(row);
   if (error) return note($("evMsg"), "Speichern fehlgeschlagen: " + error.message);
